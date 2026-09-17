@@ -57,7 +57,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="px-6 pt-4 pb-6 space-y-4">
               <div className="space-y-2">
                 <p className="text-[11px] font-bold text-slate-500">계정 정보</p>
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50/70 border border-slate-200">
