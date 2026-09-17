@@ -84,7 +84,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
                     className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
                   >
                     <BookOpen className="w-3.5 h-3.5" />
-                    <span>설치 가이드</span>
+                    <span>설치 및 사용 가이드</span>
                   </button>
                 </div>
               </div>
