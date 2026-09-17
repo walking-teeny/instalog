@@ -122,7 +122,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
               </button>
             </div>
 
-            <div className="p-6 max-h-[70vh] overflow-y-auto">
+            <div className="px-6 pt-4 pb-6 max-h-[70vh] overflow-y-auto">
               <ol className="space-y-2.5 list-decimal list-inside">
                 {GUIDE_STEPS.map((step, i) => (
                   <li key={i} className="text-xs text-slate-700 leading-relaxed pl-1">
