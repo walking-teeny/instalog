@@ -1,5 +1,7 @@
 import React from 'react';
-import { X, User, LogOut, Info, Chrome, Download } from 'lucide-react';
+import { X, User, LogOut, Info, Download, BookOpen } from 'lucide-react';
+
+const EXTENSION_GUIDE_URL = 'https://github.com/walking-teeny/instalog/blob/main/extension/README.md';
 
 const APP_VERSION = '1.0.0';
 
@@ -43,15 +45,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
             </div>
           </div>
 
-          <a
-            href="/instalog-extension.zip"
-            download
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
-          >
-            <Chrome className="w-3.5 h-3.5" />
-            <span>Chrome 확장 프로그램 설치</span>
-            <Download className="w-3 h-3 opacity-70 ml-1" />
-          </a>
+          <div className="space-y-2">
+            <p className="text-[11px] font-bold text-slate-500">Chrome 확장 프로그램</p>
+            <div className="flex items-center gap-2">
+              <a
+                href="/instalog-extension.zip"
+                download
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>프로그램 설치</span>
+              </a>
+              <a
+                href={EXTENSION_GUIDE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>설치 가이드</span>
+              </a>
+            </div>
+          </div>
 
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-2 text-[11px] text-slate-400">
