@@ -1,32 +1,51 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  ArrowLeft, 
-  Search, 
-  Download, 
-  Plus, 
-  Calendar, 
-  Edit3, 
-  Trash2, 
-  ExternalLink, 
-  CheckCircle2, 
-  Clock, 
-  Layers, 
-  TrendingUp, 
-  Send,
-  Zap,
-  Check,
-  Edit2
+import React, { useState, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
+import {
+  ArrowLeft,
+  Search,
+  Calendar,
+  Download,
+  Plus,
+  Edit2,
+  SlidersHorizontal,
+  Trash2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-import { Project, DmLog, DmStatus, ContactChannel } from '../types';
+import { Project, DmLog, DmStatus, ContactChannel, ProjectType } from '../types';
+
+const COL_WIDTHS_STORAGE_KEY = 'instalog_project_log_col_widths';
+const DEFAULT_COL_WIDTHS = [110, 200, 110, 120, 70, 280, 40];
+
+const loadColWidths = (): number[] => {
+  try {
+    const saved = localStorage.getItem(COL_WIDTHS_STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : null;
+    if (Array.isArray(parsed) && parsed.length === DEFAULT_COL_WIDTHS.length) {
+      return parsed;
+    }
+  } catch {
+    // ignore malformed/inaccessible storage
+  }
+  return DEFAULT_COL_WIDTHS;
+};
+
+// "2026-09-14 14:38:12" -> "26.09.14 14:38"
+const formatUpdatedAt = (timestamp: string) => {
+  const [datePart, timePart] = timestamp.split(' ');
+  return `${datePart.slice(2).replace(/-/g, '.')} ${(timePart || '').slice(0, 5)}`;
+};
 
 interface ProjectDetailViewProps {
   project: Project;
   logs: DmLog[];
   onBack: () => void;
   onUpdateProject: (updatedProject: Project) => void;
+  onDeleteProject?: (projectId: string) => void;
   onUpdateLog: (updatedLog: DmLog) => void;
+  onDeleteLog?: (logId: string) => void;
   onOpenManualModal: () => void;
-  onOpenSimulator: () => void;
 }
 
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
@@ -34,28 +53,89 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
   logs,
   onBack,
   onUpdateProject,
+  onDeleteProject,
   onUpdateLog,
+  onDeleteLog,
   onOpenManualModal,
-  onOpenSimulator,
 }) => {
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<'page' | 'all' | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | DmStatus>('all');
+  const [channelFilter, setChannelFilter] = useState<'all' | ContactChannel>('all');
+  const [secondMessageFilter, setSecondMessageFilter] = useState<'all' | 'sent' | 'not_sent'>('all');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editName, setEditName] = useState(project.name);
-  const [editBrand, setEditBrand] = useState(project.brand);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editDescription, setEditDescription] = useState(project.description || '');
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [tempMemo, setTempMemo] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+
+  // Resizable table columns (persisted so user-adjusted widths survive reloads)
+  const [colWidths, setColWidths] = useState<number[]>(loadColWidths);
+  const resizing = useRef<{ index: number; startX: number; startWidth: number } | null>(null);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(COL_WIDTHS_STORAGE_KEY, JSON.stringify(colWidths));
+    } catch {
+      // ignore inaccessible storage (e.g. private browsing)
+    }
+  }, [colWidths]);
+
+  const handleResizeStart = (index: number) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = { index, startX: e.clientX, startWidth: colWidths[index] };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizing.current) return;
+      const { index: i, startX, startWidth } = resizing.current;
+      const newWidth = Math.max(40, startWidth + (moveEvent.clientX - startX));
+      setColWidths((prev) => {
+        const next = [...prev];
+        next[i] = newWidth;
+        return next;
+      });
+    };
+
+    const handleMouseUp = () => {
+      resizing.current = null;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   // Project-specific logs
   const projectLogs = useMemo(() => {
     return logs.filter((l) => l.projectId === project.id);
   }, [logs, project.id]);
 
+  const statusCounts = useMemo(() => {
+    return {
+      all: projectLogs.length,
+      waiting: projectLogs.filter((l) => l.status === 'waiting' || l.status === '').length,
+      in_talks: projectLogs.filter((l) => l.status === 'in_talks').length,
+      rejected: projectLogs.filter((l) => l.status === 'rejected').length,
+      confirmed: projectLogs.filter((l) => l.status === 'confirmed').length,
+    };
+  }, [projectLogs]);
+
   const filteredLogs = useMemo(() => {
     let result = [...projectLogs];
 
     if (statusFilter !== 'all') {
-      result = result.filter((l) => l.status === statusFilter);
+      result = result.filter((l) =>
+        statusFilter === 'waiting' ? l.status === 'waiting' || l.status === '' : l.status === statusFilter
+      );
     }
 
     if (searchTerm.trim()) {
@@ -63,31 +143,56 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       result = result.filter(
         (l) =>
           l.influencer.handle.toLowerCase().includes(q) ||
+          l.influencer.nickname.toLowerCase().includes(q) ||
           l.memo.toLowerCase().includes(q)
       );
     }
 
-    return result;
-  }, [projectLogs, statusFilter, searchTerm]);
+    if (channelFilter !== 'all') {
+      result = result.filter((l) => l.channel === channelFilter);
+    }
 
-  const totalSent = projectLogs.length;
-  const repliedCount = projectLogs.filter((l) => l.status !== 'waiting').length;
-  const confirmedCount = projectLogs.filter((l) => l.status === 'confirmed').length;
-  const replyRate = totalSent > 0 
-    ? ((repliedCount / totalSent) * 100).toFixed(1)
-    : '0.0';
+    if (secondMessageFilter !== 'all') {
+      result = result.filter((l) =>
+        secondMessageFilter === 'sent' ? l.secondMessageSent : !l.secondMessageSent
+      );
+    }
+
+    if (dateFrom) {
+      result = result.filter((l) => l.timestamp.slice(0, 10) >= dateFrom);
+    }
+    if (dateTo) {
+      result = result.filter((l) => l.timestamp.slice(0, 10) <= dateTo);
+    }
+
+    return result;
+  }, [projectLogs, statusFilter, searchTerm, channelFilter, secondMessageFilter, dateFrom, dateTo]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredLogs.slice(start, start + itemsPerPage);
+  }, [filteredLogs, currentPage, itemsPerPage]);
 
   const handleSaveProjectInfo = () => {
     if (!editName.trim()) return;
     onUpdateProject({
       ...project,
       name: editName.trim(),
-      brand: editBrand.trim(),
     });
     setIsEditingTitle(false);
   };
 
-  const exportProjectCSV = () => {
+  const handleSaveDescription = () => {
+    onUpdateProject({
+      ...project,
+      description: editDescription.trim(),
+    });
+    setIsEditingDescription(false);
+  };
+
+  const exportProjectExcel = (scope: 'page' | 'all') => {
+    const targetLogs = scope === 'page' ? paginatedLogs : projectLogs;
     const headers = [
       '로그ID',
       '발송일시',
@@ -105,9 +210,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       in_talks: '소통 중',
       confirmed: '협업 성사',
       rejected: '거절',
+      '': '회신 대기',
     };
 
-    const rows = filteredLogs.map((log) => [
+    const rows = targetLogs.map((log) => [
       log.id,
       log.timestamp,
       `@${log.influencer.handle}`,
@@ -116,321 +222,440 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       statusMap[log.status],
       log.channel,
       log.secondMessageSent ? '완료' : '미발송',
-      `"${(log.memo || '').replace(/"/g, '""')}"`,
+      log.memo || '',
     ]);
 
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${project.name}_DM리스트_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'DM 리스트');
+    XLSX.writeFile(workbook, `${project.name}_DM리스트_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    setIsExportModalOpen(false);
   };
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto space-y-6">
       {/* Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-emerald-600 transition-colors cursor-pointer py-1 px-2 -ml-2 rounded-lg hover:bg-slate-100"
+          className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer py-1 px-2 -ml-2 rounded-lg hover:bg-slate-100"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>대시보드로 돌아가기</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={onOpenSimulator}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200 hover:bg-emerald-100 transition-all cursor-pointer"
+            onClick={onOpenManualModal}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-slate-700 text-xs font-semibold hover:text-emerald-700 transition-all cursor-pointer"
           >
-            <Zap className="w-3.5 h-3.5 text-emerald-600" />
-            <span>이 캠페인으로 위젯 DM 발송 테스트</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>직접 추가</span>
           </button>
           <button
-            onClick={exportProjectCSV}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00c73c] text-white text-xs font-bold shadow-sm shadow-[#00c73c]/20 hover:bg-[#00b035] transition-all cursor-pointer"
+            onClick={() => {
+              setExportScope(null);
+              setIsExportModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00c73c] hover:bg-[#00b035] text-white text-xs font-bold shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>CSV 다운로드</span>
+            <span>데이터 다운로드</span>
           </button>
+          {onDeleteProject && (
+            <button
+              onClick={() => setIsDeleteProjectModalOpen(true)}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-slate-100 transition-all cursor-pointer"
+              title="프로젝트 삭제"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Project Banner & Quick Editor */}
-      <div className="p-6 bg-white rounded-3xl border border-[#e2e8f0] shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div className="space-y-1.5 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-600 font-mono bg-slate-100 px-2 py-0.5 rounded">
-                {project.tag}
-              </span>
-              <span
-                className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                  project.status === 'active'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-slate-100 text-slate-600 border border-slate-200'
-                }`}
-              >
-                {project.statusText}
-              </span>
+      <div className="space-y-6" style={{ marginBottom: '16px' }}>
+        <div className="space-y-1.5">
+            <div className="flex items-center">
+              {/* Quick status switch */}
+              <div className="relative flex items-center gap-2 bg-slate-50 py-2 pr-2 rounded-2xl shrink-0 mr-1">
+                <select
+                  value={project.status === 'active' || project.status === 'waiting' ? 'active' : 'completed'}
+                  onChange={(e) => {
+                    const newStatus = e.target.value as 'active' | 'completed';
+                    onUpdateProject({
+                      ...project,
+                      status: newStatus,
+                      statusText: newStatus === 'active' ? '진행 중' : '종료',
+                    });
+                  }}
+                  className={`appearance-none text-xs font-bold rounded-xl pl-3 pr-8 py-1.5 focus:outline-none cursor-pointer border ${
+                    project.status === 'active' || project.status === 'waiting'
+                      ? 'bg-emerald-50 text-[#006e1d] border-emerald-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  <option value="active">진행 중</option>
+                  <option value="completed">종료</option>
+                </select>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                    project.status === 'active' || project.status === 'waiting'
+                      ? 'text-[#006e1d]'
+                      : 'text-slate-400'
+                  }`}
+                />
+              </div>
+
+              {/* Project type */}
+              <div className="relative flex items-center gap-2 bg-slate-50 py-2 pr-2 rounded-2xl shrink-0 mr-2">
+                <select
+                  value={project.projectType}
+                  onChange={(e) => {
+                    onUpdateProject({
+                      ...project,
+                      projectType: e.target.value as ProjectType,
+                    });
+                  }}
+                  className="appearance-none text-xs font-bold bg-white border border-slate-200 rounded-xl pl-3 pr-8 py-1.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="공동구매">공동구매</option>
+                  <option value="협찬">협찬</option>
+                  <option value="광고">광고</option>
+                  <option value="기타">기타</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
               <span className="text-xs text-slate-400">생성일: {project.createdAt}</span>
             </div>
 
-            {isEditingTitle ? (
-              <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between gap-4">
+              {isEditingTitle ? (
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full text-xl font-bold px-3 py-1.5 border border-emerald-400 rounded-xl focus:outline-none"
+                  onBlur={handleSaveProjectInfo}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveProjectInfo();
+                    if (e.key === 'Escape') setIsEditingTitle(false);
+                  }}
+                  className="flex-1 text-xl font-bold px-3 py-1.5 border border-emerald-400 rounded-xl focus:outline-none"
                   placeholder="프로젝트명"
+                  autoFocus
                 />
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={editBrand}
-                    onChange={(e) => setEditBrand(e.target.value)}
-                    className="text-xs font-semibold px-3 py-1 border border-slate-300 rounded-lg focus:outline-none"
-                    placeholder="소속 브랜드/업체명"
-                  />
-                  <button
-                    onClick={handleSaveProjectInfo}
-                    className="px-3 py-1 bg-[#00c73c] text-white text-xs font-bold rounded-lg"
-                  >
-                    저장 완료
-                  </button>
-                  <button
-                    onClick={() => setIsEditingTitle(false)}
-                    className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg"
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-baseline gap-3 group">
-                <h1 className="text-2xl font-black text-[#111827] tracking-tight">
+              ) : (
+                <h1
+                  onClick={() => setIsEditingTitle(true)}
+                  className="text-2xl font-black text-[#111827] tracking-tight cursor-pointer hover:text-emerald-600 transition-colors"
+                  title="클릭하여 수정"
+                >
                   {project.name}
                 </h1>
-                <span className="text-sm font-bold text-slate-600">({project.brand})</span>
-                <button
-                  onClick={() => setIsEditingTitle(true)}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-700 transition-opacity"
-                  title="프로젝트 정보 수정"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+              )}
+            </div>
 
-            {project.description && (
-              <p className="text-xs text-slate-500 leading-relaxed pt-1">
-                {project.description}
+            {isEditingDescription ? (
+              <input
+                type="text"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                onBlur={handleSaveDescription}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveDescription();
+                  if (e.key === 'Escape') setIsEditingDescription(false);
+                }}
+                className="w-full text-xs text-slate-600 leading-relaxed pt-1 px-3 py-1.5 border border-emerald-400 rounded-lg focus:outline-none"
+                placeholder="프로젝트 메모 입력"
+                autoFocus
+              />
+            ) : (
+              <p
+                onClick={() => {
+                  setEditDescription(project.description || '');
+                  setIsEditingDescription(true);
+                }}
+                className="text-xs text-slate-500 leading-relaxed pt-1 cursor-pointer hover:text-emerald-600 transition-colors"
+                title="클릭하여 수정"
+              >
+                {project.description || '메모 추가...'}
               </p>
             )}
-          </div>
-
-          {/* Quick status switch */}
-          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-            <span className="text-xs font-medium text-slate-600 px-2">상태 변경:</span>
-            <select
-              value={project.status}
-              onChange={(e) => {
-                const newStatus = e.target.value as any;
-                const statusMap: Record<string, string> = {
-                  active: '기록 활성',
-                  waiting: '진행 중',
-                  paused: '수집 일시정지',
-                };
-                onUpdateProject({
-                  ...project,
-                  status: newStatus,
-                  statusText: statusMap[newStatus] || '진행 중',
-                });
-              }}
-              className="text-xs font-bold bg-white border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
-            >
-              <option value="active">🟢 기록 활성 (연동 중)</option>
-              <option value="waiting">🟡 진행 중 (대기열 할당)</option>
-              <option value="paused">⚪ 수집 일시정지</option>
-            </select>
-          </div>
         </div>
 
-        {/* 3 Metric Cards for This Project */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-          <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100">
-            <p className="text-xs font-medium text-slate-500">총 발송량</p>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-2xl font-black text-[#111827] font-mono">{totalSent}</span>
-              <span className="text-xs text-slate-500 font-bold">건</span>
-            </div>
-          </div>
-
-          <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-500">회신 완료율</p>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                {replyRate}%
-              </span>
-            </div>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-2xl font-black text-emerald-700 font-mono">{repliedCount}</span>
-              <span className="text-xs text-slate-500 font-bold">건 회신</span>
-            </div>
-          </div>
-
-          <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100">
-            <p className="text-xs font-medium text-slate-500">협업 성사 및 확정</p>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-2xl font-black text-[#00c73c] font-mono">{confirmedCount}</span>
-              <span className="text-xs text-slate-500 font-bold">건 성사</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Detail Table Header & Controls */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-[#111827]">캠페인 발송 및 수집 리스트</h2>
-            <span className="text-xs text-slate-400 font-medium">({filteredLogs.length}건)</span>
+        {/* Status Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+              statusFilter === 'all'
+                ? 'bg-[#00c73c] text-white shadow-sm border-[#00c73c]'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+            }`}
+          >
+            <span>전체 로그</span>
+            <span className={`text-[11px] px-1.5 py-0.2 rounded-full ${statusFilter === 'all' ? 'bg-black/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+              {statusCounts.all}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('waiting')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+              statusFilter === 'waiting'
+                ? 'bg-blue-600 text-white shadow-sm border-blue-600'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+            <span>회신 대기</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
+              {statusCounts.waiting}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('in_talks')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+              statusFilter === 'in_talks'
+                ? 'bg-amber-500 text-white shadow-sm border-amber-500'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span>소통 중</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
+              {statusCounts.in_talks}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('rejected')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+              statusFilter === 'rejected'
+                ? 'bg-rose-500 text-white shadow-sm border-rose-500'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            <span>거절</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
+              {statusCounts.rejected}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatusFilter('confirmed')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+              statusFilter === 'confirmed'
+                ? 'bg-emerald-600 text-white shadow-sm border-emerald-600'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span>협업 성사</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
+              {statusCounts.confirmed}
+            </span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[260px] max-w-sm">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="아이디, 닉네임 또는 메모 검색"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#00c73c] focus:bg-white"
+            />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Search */}
-            <div className="relative min-w-[220px]">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="아이디 또는 메모 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#00c73c]"
-              />
-            </div>
+          {/* Date Range */}
+          <div className="flex items-center gap-1 pl-3 pr-2 py-2 bg-slate-50/70 border border-slate-200 rounded-xl">
+            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              onClick={(e) => e.currentTarget.showPicker?.()}
+              className="w-[88px] text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer"
+            />
+            <span className="text-slate-400 text-xs">~</span>
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              onClick={(e) => e.currentTarget.showPicker?.()}
+              className="w-[88px] text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                }}
+                className="text-slate-400 hover:text-slate-600 text-xs px-1"
+                title="기간 초기화"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-            {/* Status Filter */}
+          {/* Channel Filter */}
+          <div className="relative">
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none cursor-pointer"
+              value={channelFilter}
+              onChange={(e) => setChannelFilter(e.target.value as 'all' | ContactChannel)}
+              className="appearance-none pl-8 pr-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none cursor-pointer"
             >
-              <option value="all">전체 상태 보기</option>
-              <option value="waiting">회신 대기</option>
-              <option value="in_talks">소통 중</option>
-              <option value="confirmed">협업 성사</option>
-              <option value="rejected">거절</option>
+              <option value="all">기타 소통 수단</option>
+              <option value="none">없음</option>
+              <option value="email">메일</option>
+              <option value="inpock">인포크</option>
+              <option value="email_inpock">메일+인포크</option>
             </select>
+            <SlidersHorizontal className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
 
-            {/* Add Manual Log */}
-            <button
-              onClick={onOpenManualModal}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-300 hover:border-emerald-500 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+          {/* Second Message Filter */}
+          <div className="relative">
+            <select
+              value={secondMessageFilter}
+              onChange={(e) => setSecondMessageFilter(e.target.value as 'all' | 'sent' | 'not_sent')}
+              className="appearance-none pl-8 pr-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>수기 로그 추가</span>
-            </button>
+              <option value="all">2차 발송</option>
+              <option value="sent">발송함</option>
+              <option value="not_sent">발송 안 함</option>
+            </select>
+            <SlidersHorizontal className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
 
         {/* Table for this project */}
         <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm overflow-hidden">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse table-fixed">
+            <colgroup>
+              {colWidths.map((w, i) => (
+                <col key={i} style={{ width: `${w}px` }} />
+              ))}
+            </colgroup>
             <thead>
               <tr className="bg-slate-50/80 border-b border-[#e2e8f0] text-slate-600 font-semibold">
-                <th className="py-3 px-4 w-[130px]">감지 일시</th>
-                <th className="py-3 px-4 min-w-[180px]">인플루언서 아이디</th>
-                <th className="py-3 px-4 w-[140px]">진행 상태</th>
-                <th className="py-3 px-4 w-[120px]">기타 수단</th>
-                <th className="py-3 px-3 w-[80px] text-center">2차 발송</th>
-                <th className="py-3 px-4 min-w-[260px]">메모 (클릭하여 수정)</th>
+                {[
+                  '최근 업데이트',
+                  '인플루언서 계정 정보',
+                  '소통 상태',
+                  '기타 소통 수단',
+                  '2차 발송',
+                  '메모',
+                  '',
+                ].map((label, i) => (
+                  <th key={i} className="py-3 px-4 relative overflow-hidden text-ellipsis whitespace-nowrap">
+                    {label}
+                    <span
+                      onMouseDown={handleResizeStart(i)}
+                      className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-emerald-400/50 select-none"
+                    />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f1f5f9]">
-              {filteredLogs.length === 0 ? (
+              {paginatedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    등록된 DM 발송 기록이 없습니다. 위젯을 통해 DM을 발송하거나 수기로 등록해 보세요.
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    등록된 DM 발송 기록이 없습니다. 크롬 확장 프로그램으로 DM을 발송하거나 수기로 등록해 보세요.
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => {
+                paginatedLogs.map((log) => {
                   const isEditing = editingMemoId === log.id;
                   return (
                     <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3.5 px-4 font-mono">
-                        <span className="font-bold text-slate-700">{log.timeAgo}</span>
-                        <p className="text-[11px] text-slate-400">{log.timestamp}</p>
+                        <span className="font-bold text-slate-700">{formatUpdatedAt(log.timestamp)}</span>
+                      </td>
+
+                      <td className="py-3.5 px-4 overflow-hidden">
+                        <a
+                          href={log.influencer.profileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-slate-800 hover:text-emerald-600 transition-colors font-mono truncate block min-w-0"
+                        >
+                          @{log.influencer.handle}
+                        </a>
+                        <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">{log.influencer.nickname || log.influencer.handle}</p>
+                        <p className="text-[10px] text-slate-400 font-mono mt-1 truncate">
+                          팔로워 {log.influencer.followers}
+                        </p>
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <a
-                            href={log.influencer.profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-bold text-slate-800 hover:text-emerald-600 transition-colors font-mono flex items-center gap-1"
+                        <div className="relative">
+                          <select
+                            value={log.status || 'waiting'}
+                            onChange={(e) => {
+                              onUpdateLog({
+                                ...log,
+                                status: e.target.value as DmStatus,
+                              });
+                            }}
+                            className={`w-full appearance-none text-xs font-bold pl-0 pr-4 py-1 rounded-lg cursor-pointer focus:outline-none ${
+                              log.status === 'confirmed'
+                                ? 'text-emerald-700'
+                                : log.status === 'in_talks'
+                                ? 'text-amber-800'
+                                : log.status === 'rejected'
+                                ? 'text-rose-700'
+                                : 'text-blue-700'
+                            }`}
                           >
-                            @{log.influencer.handle}
-                            <ExternalLink className="w-3 h-3 text-slate-400" />
-                          </a>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            ({log.influencer.followers})
-                          </span>
+                            <option value="waiting">회신 대기</option>
+                            <option value="in_talks">소통 중</option>
+                            <option value="confirmed">협업 성사</option>
+                            <option value="rejected">거절</option>
+                          </select>
+                          <ChevronDown className="w-3 h-3 text-slate-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
                         </div>
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <select
-                          value={log.status}
-                          onChange={(e) => {
-                            onUpdateLog({
-                              ...log,
-                              status: e.target.value as DmStatus,
-                            });
-                          }}
-                          className={`text-xs font-bold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none ${
-                            log.status === 'confirmed'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : log.status === 'in_talks'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : log.status === 'rejected'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : 'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}
-                        >
-                          <option value="waiting">회신 대기</option>
-                          <option value="in_talks">소통 중</option>
-                          <option value="confirmed">협업 성사</option>
-                          <option value="rejected">거절</option>
-                        </select>
+                        <div className="relative">
+                          <select
+                            value={log.channel}
+                            onChange={(e) => {
+                              onUpdateLog({
+                                ...log,
+                                channel: e.target.value as ContactChannel,
+                              });
+                            }}
+                            className="w-full appearance-none text-xs text-slate-700 rounded-lg pl-0 pr-4 py-1 cursor-pointer focus:outline-none font-medium"
+                          >
+                            <option value="none">없음</option>
+                            <option value="email">메일</option>
+                            <option value="inpock">인포크</option>
+                            <option value="email_inpock">메일+인포크</option>
+                          </select>
+                          <ChevronDown className="w-3 h-3 text-slate-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <select
-                          value={log.channel}
-                          onChange={(e) => {
-                            onUpdateLog({
-                              ...log,
-                              channel: e.target.value as ContactChannel,
-                            });
-                          }}
-                          className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2 py-1 cursor-pointer focus:outline-none font-medium"
-                        >
-                          <option value="none">없음</option>
-                          <option value="email">메일</option>
-                          <option value="inpock">인포크</option>
-                          <option value="email_inpock">메일+인포크</option>
-                        </select>
-                      </td>
-
-                      <td className="py-3.5 px-3 text-center">
                         <input
                           type="checkbox"
                           checked={log.secondMessageSent}
@@ -477,13 +702,25 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                               setEditingMemoId(log.id);
                               setTempMemo(log.memo);
                             }}
-                            className="group flex items-center justify-between cursor-pointer py-1 px-1.5 rounded hover:bg-slate-100"
+                            className="group flex items-center justify-between cursor-pointer py-1 pl-0 pr-1.5 rounded hover:bg-slate-100"
                           >
                             <span className={`line-clamp-1 ${log.memo ? 'text-slate-700' : 'text-slate-400 italic'}`}>
                               {log.memo || '메모 추가...'}
                             </span>
                             <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 ml-1" />
                           </div>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-2">
+                        {onDeleteLog && (
+                          <button
+                            onClick={() => setDeleteTargetId(log.id)}
+                            className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
+                            title="로그 삭제"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -493,7 +730,196 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        <div className="py-3 px-4 bg-slate-50/80 border-t border-[#e2e8f0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+          <div className="relative flex items-center gap-2">
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="appearance-none bg-white border border-slate-200 rounded pl-2 pr-6 py-1 font-medium focus:outline-none cursor-pointer"
+            >
+              <option value={50}>50개</option>
+              <option value={100}>100개</option>
+              <option value={500}>500개</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {Array.from({ length: totalPages }).map((_, idx) => {
+              const pageNum = idx + 1;
+              if (
+                totalPages > 6 &&
+                pageNum !== 1 &&
+                pageNum !== totalPages &&
+                Math.abs(pageNum - currentPage) > 1
+              ) {
+                if (pageNum === 2 || pageNum === totalPages - 1) {
+                  return <span key={pageNum} className="px-1 text-slate-400">...</span>;
+                }
+                return null;
+              }
+
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-7 h-7 rounded-md font-bold transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-[#00c73c] text-white shadow-sm'
+                      : 'hover:bg-white text-slate-700'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        </div>
       </div>
+
+      {/* Delete Confirmation */}
+      {deleteTargetId && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setDeleteTargetId(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl border border-[#e2e8f0] shadow-2xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-bold text-[#111827]">정말 삭제하시겠습니까?</h3>
+            <p className="text-xs text-slate-500">삭제한 데이터는 복구할 수 없습니다.</p>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setDeleteTargetId(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteLog?.(deleteTargetId);
+                  setDeleteTargetId(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold cursor-pointer"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Scope Selection */}
+      {isExportModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setIsExportModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl border border-[#e2e8f0] shadow-2xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-bold text-[#111827]">다운로드할 데이터를 선택해 주세요</h3>
+            <div className="space-y-2">
+              <button
+                onClick={() => setExportScope('page')}
+                className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer ${
+                  exportScope === 'page'
+                    ? 'border-emerald-400 bg-emerald-50/50'
+                    : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/50'
+                }`}
+              >
+                <p className="text-xs font-bold text-[#111827]">현재 페이지에 표시되는 데이터만</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">선택한 페이지 및 적용된 필터의 결과만 다운로드합니다.</p>
+              </button>
+              <button
+                onClick={() => setExportScope('all')}
+                className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer ${
+                  exportScope === 'all'
+                    ? 'border-emerald-400 bg-emerald-50/50'
+                    : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/50'
+                }`}
+              >
+                <p className="text-xs font-bold text-[#111827]">이 프로젝트의 모든 데이터</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">이 프로젝트의 모든 데이터를 다운로드합니다.</p>
+              </button>
+            </div>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  if (exportScope) exportProjectExcel(exportScope);
+                }}
+                disabled={!exportScope}
+                className="px-4 py-2 rounded-xl bg-[#00c73c] hover:bg-[#00b035] disabled:bg-slate-200 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer"
+              >
+                다음
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Project Confirmation */}
+      {isDeleteProjectModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setIsDeleteProjectModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl border border-[#e2e8f0] shadow-2xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-bold text-[#111827]">정말 삭제하시겠습니까?</h3>
+            <p className="text-xs text-slate-500">삭제한 데이터는 복구할 수 없습니다.</p>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setIsDeleteProjectModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteProject?.(project.id);
+                  setIsDeleteProjectModalOpen(false);
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold cursor-pointer"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

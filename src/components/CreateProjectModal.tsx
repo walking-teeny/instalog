@@ -5,7 +5,7 @@ import { Project, ProjectType } from '../types';
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (newProject: Omit<Project, 'id' | 'totalSent' | 'repliedCount' | 'confirmedCount' | 'createdAt'>) => void;
+  onCreate: (newProject: Omit<Project, 'id' | 'totalSent' | 'repliedCount' | 'confirmedCount' | 'createdAt' | 'updatedAt'>) => void;
 }
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
@@ -43,8 +43,11 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div 
+    <div
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
         className="w-full max-w-lg bg-white rounded-3xl border border-[#e2e8f0] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
@@ -138,7 +141,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               type="submit"
               className="px-5 py-2.5 rounded-xl bg-[#00c73c] hover:bg-[#00b035] text-white text-xs font-bold shadow-sm shadow-[#00c73c]/30 transition-all cursor-pointer"
             >
-              생성 완료
+              생성
             </button>
           </div>
         </form>

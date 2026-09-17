@@ -1,0 +1,238 @@
+* { box-sizing: border-box; }
+
+body {
+  width: 280px;
+  margin: 0;
+  padding: 16px;
+  font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color: #111827;
+  background: #fff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #00c73c;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo svg {
+  width: 16px;
+  height: 16px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.account-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.account-btn[hidden] {
+  display: none;
+}
+
+.account-btn:hover {
+  color: #64748b;
+}
+
+.account-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.view { display: none; }
+.view.active { display: block; }
+
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+label.label-light {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+input, select {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #111827;
+}
+
+/* 네이티브 select의 화살표는 브라우저가 자체 여백을 붙여 좌우 간격이 어긋나므로,
+   직접 그린 화살표로 교체해 좌측 텍스트 여백(10px)과 우측 여백을 동일하게 맞춥니다. */
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.select-wrapper {
+  margin-bottom: 12px;
+}
+
+.select-chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+button {
+  cursor: pointer;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  border: none;
+}
+
+button.primary {
+  width: 100%;
+  padding: 9px;
+  background: #00c73c;
+  color: #fff;
+}
+
+button.secondary {
+  padding: 6px 10px;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+button.danger {
+  padding: 6px 10px;
+  background: #f43f5e;
+  color: #fff;
+}
+
+.error {
+  color: #f43f5e;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 3px 0 10px;
+  min-height: 7px;
+}
+
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+.modal-box {
+  width: 220px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-text {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: #111827;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-actions button {
+  flex: 1;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.toggle-row button {
+  flex: 1;
+  padding: 9px;
+}
+
+.recording-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.recording-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.recording-btn.recording-on {
+  background: #f43f5e;
+  color: #fff;
+}
+
+.recording-btn.recording-off {
+  background: #00c73c;
+  color: #fff;
+}
+
+.hint {
+  font-size: 11px;
+  color: #000;
+  line-height: 1.4;
+  margin: 0;
+}

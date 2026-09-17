@@ -1,0 +1,17 @@
+# Fly.io deploy config (only needed if NOT deploying to Vercel). First-time setup:
+#   fly launch --no-deploy          # creates the app, keep this fly.toml
+#   fly secrets set JWT_SECRET=... ADMIN_USERNAME=... ADMIN_PASSWORD=... POSTGRES_URL=...
+#   fly deploy
+# No volume needed — state lives in Postgres (Vercel Postgres, Neon, etc.), not on local disk.
+
+app = "instalog"          # must be globally unique — change this
+primary_region = "nrt"    # nrt = Tokyo; pick the region closest to your users
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1

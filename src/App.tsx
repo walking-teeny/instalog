@@ -1,98 +1,117 @@
 import React, { useState, useEffect } from 'react';
+import { Instagram, Settings } from 'lucide-react';
 import { DashboardView } from './components/DashboardView';
 import { DmLogsView } from './components/DmLogsView';
 import { ProjectDetailView } from './components/ProjectDetailView';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManualLogModal } from './components/ManualLogModal';
-import { FloatingInstagramWidget } from './components/FloatingInstagramWidget';
-import { INITIAL_PROJECTS, INITIAL_DM_LOGS } from './mockData';
+import { LoginView } from './components/LoginView';
+import { SettingsModal } from './components/SettingsModal';
+import { api, getToken, getUsername, clearToken, clearUsername } from './api';
 import { Project, DmLog, DmStatus, WidgetSettings } from './types';
+import { parseRoute, pushRoute, Route } from './router';
 
 export type ActiveTab = 'dashboard' | 'logs';
 
-const STORAGE_PROJECTS_KEY = 'instalog_projects_v2';
-const STORAGE_LOGS_KEY = 'instalog_dm_logs_v2';
-const STORAGE_WIDGET_KEY = 'instalog_widget_settings_v2';
+const nowTimestamp = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+};
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [logStatusFilter, setLogStatusFilter] = useState<'all' | DmStatus>('all');
+  const [isAuthed, setIsAuthed] = useState(!!getToken());
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // Projects state with LocalStorage persistence
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_PROJECTS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_PROJECTS;
-  });
+  const initialRoute = parseRoute();
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialRoute.view === 'logs' ? 'logs' : 'dashboard');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    initialRoute.view === 'project' ? initialRoute.projectId : null
+  );
+  const [logStatusFilter, setLogStatusFilter] = useState<'all' | DmStatus>(
+    initialRoute.view === 'logs' ? initialRoute.status : 'all'
+  );
 
-  // Logs state with LocalStorage persistence
-  const [logs, setLogs] = useState<DmLog[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_LOGS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_DM_LOGS;
-  });
-
-  // Widget settings
-  const [widgetSettings, setWidgetSettings] = useState<WidgetSettings>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_WIDGET_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return {
-      isRecording: true,
-      selectedProjectId: 'proj_1',
-      pairingAccount: '@beauty_commerce_kr',
-      latencyMs: 84,
-      port: '9224',
-      todayLogsCount: 142,
-      lastPing: '방금 전 (12:34:28)',
-    };
-  });
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [logs, setLogs] = useState<DmLog[]>([]);
+  const [widgetSettings, setWidgetSettings] = useState<WidgetSettings | null>(null);
 
   // Modals & Floating toast
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [lastToastNotification, setLastToastNotification] = useState<string | null>(null);
+  const [toastVariant, setToastVariant] = useState<'success' | 'danger'>('success');
 
-  // Sync to LocalStorage
+  // Force back to the login screen whenever the API rejects the stored token.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_PROJECTS_KEY, JSON.stringify(projects));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [projects]);
+    const handleUnauthorized = () => setIsAuthed(false);
+    window.addEventListener('instalog:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('instalog:unauthorized', handleUnauthorized);
+  }, []);
 
+  // Keep the on-screen view in sync with the URL for browser back/forward navigation.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_LOGS_KEY, JSON.stringify(logs));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [logs]);
+    const applyRoute = (route: Route) => {
+      if (route.view === 'project') {
+        setSelectedProjectId(route.projectId);
+      } else if (route.view === 'logs') {
+        setSelectedProjectId(null);
+        setActiveTab('logs');
+        setLogStatusFilter(route.status);
+      } else {
+        setSelectedProjectId(null);
+        setActiveTab('dashboard');
+      }
+    };
+    const handlePopState = () => applyRoute(parseRoute());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
+  const navigateToDashboard = () => {
+    setSelectedProjectId(null);
+    setActiveTab('dashboard');
+    pushRoute({ view: 'dashboard' });
+  };
+
+  const navigateToProject = (id: string) => {
+    setSelectedProjectId(id);
+    pushRoute({ view: 'project', projectId: id });
+  };
+
+  const navigateToLogs = (status: 'all' | DmStatus = 'all') => {
+    setSelectedProjectId(null);
+    setActiveTab('logs');
+    setLogStatusFilter(status);
+    pushRoute({ view: 'logs', status });
+  };
+
+  // Load all data from the server once logged in.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_WIDGET_KEY, JSON.stringify(widgetSettings));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [widgetSettings]);
+    if (!isAuthed) return;
+    setIsLoadingData(true);
+    Promise.all([api.getProjects(), api.getLogs(), api.getWidgetSettings()])
+      .then(([p, l, w]) => {
+        setProjects(p);
+        setLogs(l);
+        setWidgetSettings(w);
+      })
+      .catch((e) => console.error('데이터를 불러오지 못했습니다.', e))
+      .finally(() => setIsLoadingData(false));
+  }, [isAuthed]);
+
+  // Poll the recording state so the header badge tracks the Chrome extension's toggle.
+  useEffect(() => {
+    if (!isAuthed) return;
+    const interval = setInterval(() => {
+      api.getWidgetSettings().then(setWidgetSettings).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isAuthed]);
 
   // Project handlers
   const handleCreateProject = (
-    newProjectData: Omit<Project, 'id' | 'totalSent' | 'repliedCount' | 'confirmedCount' | 'createdAt'>
+    newProjectData: Omit<Project, 'id' | 'totalSent' | 'repliedCount' | 'confirmedCount' | 'createdAt' | 'updatedAt'>
   ) => {
     const newProj: Project = {
       ...newProjectData,
@@ -101,150 +120,139 @@ export default function App() {
       repliedCount: 0,
       confirmedCount: 0,
       createdAt: new Date().toISOString().slice(0, 10),
+      updatedAt: nowTimestamp(),
     };
     setProjects((prev) => [newProj, ...prev]);
-    setWidgetSettings((prev) => ({ ...prev, selectedProjectId: newProj.id }));
+    api.createProject(newProj).catch(console.error);
+
+    if (widgetSettings) {
+      const updatedWidget = { ...widgetSettings, selectedProjectId: newProj.id };
+      setWidgetSettings(updatedWidget);
+      api.updateWidgetSettings(updatedWidget).catch(console.error);
+    }
     showToast(`새 프로젝트 '${newProj.name}'이(가) 등록되었습니다.`);
   };
 
   const handleUpdateProject = (updated: Project) => {
-    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    const withTimestamp = { ...updated, updatedAt: nowTimestamp() };
+    setProjects((prev) => prev.map((p) => (p.id === withTimestamp.id ? withTimestamp : p)));
+    api.updateProject(withTimestamp).catch(console.error);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    setLogs((prev) => prev.filter((l) => l.projectId !== projectId));
+    navigateToDashboard();
+    api.deleteProject(projectId).catch(console.error);
   };
 
   // Log handlers
+  const bumpProjectUpdatedAt = (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+    const updated = { ...project, updatedAt: nowTimestamp() };
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? updated : p)));
+    api.updateProject(updated).catch(console.error);
+  };
+
   const handleUpdateLog = (updated: DmLog) => {
     setLogs((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    api.updateLog(updated).catch(console.error);
+    bumpProjectUpdatedAt(updated.projectId);
   };
 
   const handleDeleteLog = (logId: string) => {
+    const target = logs.find((l) => l.id === logId);
     setLogs((prev) => prev.filter((l) => l.id !== logId));
+    api.deleteLog(logId).catch(console.error);
+    if (target) bumpProjectUpdatedAt(target.projectId);
   };
 
   const handleAddManualLog = (newLog: DmLog) => {
     setLogs((prev) => [newLog, ...prev]);
-    // increment project sent count
-    setProjects((prev) =>
-      prev.map((p) => {
-        if (p.id === newLog.projectId) {
-          return {
-            ...p,
-            totalSent: p.totalSent + 1,
-            repliedCount: newLog.status !== 'waiting' ? p.repliedCount + 1 : p.repliedCount,
-            confirmedCount: newLog.status === 'confirmed' ? p.confirmedCount + 1 : p.confirmedCount,
-            latestLog: {
-              handle: `@${newLog.influencer.handle}`,
-              action: '수기 등록',
-              timeAgo: '방금',
-            },
-          };
-        }
-        return p;
-      })
-    );
+    api.createLog(newLog).catch(console.error);
+
+    const project = projects.find((p) => p.id === newLog.projectId);
+    if (project) {
+      const updatedProject: Project = {
+        ...project,
+        totalSent: project.totalSent + 1,
+        repliedCount:
+          newLog.status !== 'waiting' && newLog.status !== '' ? project.repliedCount + 1 : project.repliedCount,
+        confirmedCount: newLog.status === 'confirmed' ? project.confirmedCount + 1 : project.confirmedCount,
+        latestLog: {
+          handle: `@${newLog.influencer.handle}`,
+          action: '수기 등록',
+          timeAgo: '방금',
+        },
+        updatedAt: nowTimestamp(),
+      };
+      setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+      api.updateProject(updatedProject).catch(console.error);
+    }
     showToast(`@${newLog.influencer.handle}님 수기 로그가 성공적으로 저장되었습니다.`);
   };
 
-  // Widget Toggle & Simulation
-  const handleToggleRecording = () => {
-    setWidgetSettings((prev) => {
-      const nextState = !prev.isRecording;
-      showToast(nextState ? '🟢 위젯 자동 기록이 활성화되었습니다.' : '⏸ 위젯 자동 기록이 일시 정지되었습니다.');
-      return {
-        ...prev,
-        isRecording: nextState,
-      };
-    });
-  };
-
-  const handleSimulateSendDm = (rawHandle: string, targetProjectId: string) => {
-    const handle = rawHandle.replace(/^@/, '').trim();
-    if (!handle) return;
-
-    if (!widgetSettings.isRecording) {
-      showToast('⚠️ 위젯이 일시 정지 상태입니다. [자동 기록 시작] 버튼을 먼저 눌러주세요.');
-      return;
-    }
-
-    const targetProject = projects.find((p) => p.id === targetProjectId) || projects[0];
-
-    const now = new Date();
-    const timestampStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-
-    // Sample avatars for realism
-    const sampleAvatars = [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    ];
-    const randomAvatar = sampleAvatars[Math.floor(Math.random() * sampleAvatars.length)];
-
-    const newLog: DmLog = {
-      id: `live_${Date.now()}`,
-      projectId: targetProject.id,
-      projectName: targetProject.name,
-      timestamp: timestampStr,
-      timeAgo: '방금',
-      influencer: {
-        handle,
-        profileUrl: `https://instagram.com/${handle}`,
-        avatarUrl: randomAvatar,
-        followers: `${(Math.random() * 80 + 10).toFixed(1)}K`,
-        verified: Math.random() > 0.4,
-      },
-      status: 'waiting',
-      channel: 'none',
-      secondMessageSent: false,
-      memo: '인스타 웹 플로팅 위젯 실시간 자동 감지',
-    };
-
-    setLogs((prev) => [newLog, ...prev]);
-
-    // Update project stats
-    setProjects((prev) =>
-      prev.map((p) => {
-        if (p.id === targetProject.id) {
-          return {
-            ...p,
-            totalSent: p.totalSent + 1,
-            latestLog: {
-              handle: `@${handle}`,
-              action: '제안 발송',
-              timeAgo: '방금',
-            },
-          };
-        }
-        return p;
-      })
-    );
-
-    // Update widget counter
-    setWidgetSettings((prev) => ({
-      ...prev,
-      todayLogsCount: prev.todayLogsCount + 1,
-      lastPing: `방금 전 (${now.toTimeString().slice(0, 8)})`,
-    }));
-
-    // PRD 간이 알림: 기록 성공 시 안내
-    showToast(`@${handle}님에게 제안 발송 감지! '${targetProject.name}' 발송 횟수 +1 (누적: ${targetProject.totalSent + 1}건)`);
-  };
-
-  const showToast = (message: string) => {
+  const showToast = (message: string, variant: 'success' | 'danger' = 'success') => {
+    setToastVariant(variant);
     setLastToastNotification(message);
     setTimeout(() => {
       setLastToastNotification((current) => (current === message ? null : current));
-    }, 4500);
+    }, 3000);
   };
 
-  const handleRefresh = () => {
-    showToast('최신 인스타그램 웹 소켓 패킷 데이터를 갱신했습니다.');
+  const handleLogout = () => {
+    clearToken();
+    clearUsername();
+    setIsSettingsModalOpen(false);
+    setIsAuthed(false);
   };
+
+  if (!isAuthed) {
+    return <LoginView onLoginSuccess={() => setIsAuthed(true)} />;
+  }
+
+  if (isLoadingData || !widgetSettings) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center text-slate-400 text-sm font-medium">
+        불러오는 중...
+      </div>
+    );
+  }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] text-[#111827]">
+    <div className="flex flex-col min-h-screen bg-[#f8fafc] text-[#111827]">
+      {/* App Header */}
+      <header className="h-14 shrink-0 flex items-center justify-between px-6 bg-white border-b border-[#e2e8f0]">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-[#00c73c] flex items-center justify-center">
+            <Instagram className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-sm font-black text-[#111827] tracking-tight">InstaLog</span>
+          {widgetSettings.isRecording ? (
+            <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 font-bold tracking-tight">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              기록 중
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-bold tracking-tight">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+              기록 정지
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setIsSettingsModalOpen(true)}
+          className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+          title="설정"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+      </header>
+
+      <div className="flex flex-1 min-h-0">
       {/* Main Content Stage */}
       <main className="flex-1 min-w-0 overflow-y-auto pb-24">
         {selectedProjectId && selectedProject ? (
@@ -252,30 +260,21 @@ export default function App() {
           <ProjectDetailView
             project={selectedProject}
             logs={logs}
-            onBack={() => setSelectedProjectId(null)}
+            onBack={navigateToDashboard}
             onUpdateProject={handleUpdateProject}
+            onDeleteProject={handleDeleteProject}
             onUpdateLog={handleUpdateLog}
+            onDeleteLog={handleDeleteLog}
             onOpenManualModal={() => setIsManualModalOpen(true)}
-            onOpenSimulator={() => {
-              setWidgetSettings((prev) => ({ ...prev, selectedProjectId: selectedProject.id }));
-              showToast(`'${selectedProject.name}' 위젯 연동 상태로 준비되었습니다.`);
-            }}
           />
         ) : activeTab === 'dashboard' ? (
           /* Dashboard View (Image 1) */
           <DashboardView
             projects={projects}
             logs={logs}
-            isWidgetRecording={widgetSettings.isRecording}
-            onSelectProject={(id) => setSelectedProjectId(id)}
+            onSelectProject={navigateToProject}
             onOpenCreateModal={() => setIsCreateModalOpen(true)}
-            onOpenSimulator={() => {
-              showToast('우측 하단 인스타그램 웹 플로팅 위젯에서 실시간 테스트가 가능합니다.');
-            }}
-            onNavigateToLogs={(status) => {
-              if (status) setLogStatusFilter(status);
-              setActiveTab('logs');
-            }}
+            onNavigateToLogs={(status) => navigateToLogs(status || 'all')}
           />
         ) : (
           /* DM Logs View (Image 5) */
@@ -287,23 +286,24 @@ export default function App() {
             onUpdateLog={handleUpdateLog}
             onDeleteLog={handleDeleteLog}
             onOpenManualModal={() => setIsManualModalOpen(true)}
-            onRefresh={handleRefresh}
-            onBack={() => setActiveTab('dashboard')}
+            onBack={navigateToDashboard}
           />
         )}
       </main>
+      </div>
 
-      {/* Realtime Instagram Floating Widget Overlay (PRD Requirement 2) */}
-      <FloatingInstagramWidget
-        projects={projects}
-        selectedProjectId={widgetSettings.selectedProjectId}
-        onSelectProject={(id) => setWidgetSettings((prev) => ({ ...prev, selectedProjectId: id }))}
-        isRecording={widgetSettings.isRecording}
-        onToggleRecording={handleToggleRecording}
-        onSimulateSendDm={handleSimulateSendDm}
-        lastToastNotification={lastToastNotification}
-        onDismissToast={() => setLastToastNotification(null)}
-      />
+      {/* Toast Notification */}
+      {lastToastNotification && (
+        <div
+          className={`fixed bottom-5 right-5 z-50 max-w-sm text-white p-3.5 rounded-2xl shadow-xl backdrop-blur-md flex items-start gap-3 animate-in slide-in-from-bottom-3 duration-300 border ${
+            toastVariant === 'danger'
+              ? 'bg-rose-900/95 border-rose-500/50'
+              : 'bg-emerald-900/95 border-emerald-500/50'
+          }`}
+        >
+          <p className="flex-1 text-xs font-medium leading-snug">{lastToastNotification}</p>
+        </div>
+      )}
 
       {/* Modals */}
       <CreateProjectModal
@@ -316,8 +316,16 @@ export default function App() {
         isOpen={isManualModalOpen}
         projects={projects}
         defaultProjectId={selectedProjectId || widgetSettings.selectedProjectId}
+        lockedProjectId={selectedProjectId}
         onClose={() => setIsManualModalOpen(false)}
         onAddLog={handleAddManualLog}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        username={getUsername()}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onLogout={handleLogout}
       />
     </div>
   );

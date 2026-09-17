@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+/* Hide native date-input calendar icon so only our own Calendar icon shows */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+}

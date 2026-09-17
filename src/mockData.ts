@@ -19,6 +19,7 @@ export const INITIAL_PROJECTS: Project[] = [
       timeAgo: '1분 전',
     },
     createdAt: '2026-09-01',
+    updatedAt: '2026-09-01 00:00:00',
     description: '2026 F/W 시즌 모던웨어 룩북 릴스 및 피드 협업 제안 캠페인',
   },
   {
@@ -39,6 +40,7 @@ export const INITIAL_PROJECTS: Project[] = [
       timeAgo: '6분 전',
     },
     createdAt: '2026-09-03',
+    updatedAt: '2026-09-03 00:00:00',
     description: '수분 진정 앰플 런칭 기념 뷰티 인플루언서 50인 시딩 프로그램',
   },
   {
@@ -59,6 +61,7 @@ export const INITIAL_PROJECTS: Project[] = [
       timeAgo: '28분 전',
     },
     createdAt: '2026-09-05',
+    updatedAt: '2026-09-05 00:00:00',
     description: '어반클라우드 헤비 아우터 3종 스타일링 OOTD 착장 피드 제안',
   },
   {
@@ -79,6 +82,7 @@ export const INITIAL_PROJECTS: Project[] = [
       timeAgo: '2시간 전',
     },
     createdAt: '2026-09-08',
+    updatedAt: '2026-09-08 00:00:00',
     description: '명절 프리미엄 기프트 세트 사전 홍보 인플루언서 제안',
   },
 ];
@@ -93,8 +97,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '1분 전',
     influencer: {
       handle: 'stylist_minji',
+      nickname: '민지',
       profileUrl: 'https://instagram.com/stylist_minji',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       followers: '45.2K',
       verified: true,
     },
@@ -111,8 +115,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '14분 전',
     influencer: {
       handle: 'daily_ootd_fit',
+      nickname: '데일리핏',
       profileUrl: 'https://instagram.com/daily_ootd_fit',
-      avatarUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
       followers: '24.1K',
       verified: false,
     },
@@ -129,8 +133,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '42분 전',
     influencer: {
       handle: 'k_fashion_daily',
+      nickname: '케이패션',
       profileUrl: 'https://instagram.com/k_fashion_daily',
-      avatarUrl: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=150&auto=format&fit=crop&q=80',
       followers: '15.6K',
       verified: false,
     },
@@ -147,8 +151,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '1시간 전',
     influencer: {
       handle: 'fashion_chloe',
+      nickname: '클로이',
       profileUrl: 'https://instagram.com/fashion_chloe',
-      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
       followers: '98.4K',
       verified: true,
     },
@@ -165,8 +169,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '1시간 전',
     influencer: {
       handle: 'ootd_haru',
+      nickname: '하루',
       profileUrl: 'https://instagram.com/ootd_haru',
-      avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
       followers: '19.3K',
       verified: false,
     },
@@ -183,8 +187,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '2시간 전',
     influencer: {
       handle: 'daily_fashion_k',
+      nickname: '데일리케이',
       profileUrl: 'https://instagram.com/daily_fashion_k',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       followers: '37.8K',
       verified: false,
     },
@@ -201,8 +205,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '3시간 전',
     influencer: {
       handle: 'minimal_haru',
+      nickname: '미니멀하루',
       profileUrl: 'https://instagram.com/minimal_haru',
-      avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
       followers: '52.1K',
       verified: true,
     },
@@ -219,8 +223,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '4시간 전',
     influencer: {
       handle: 'street_snap_kr',
+      nickname: '스트릿스냅',
       profileUrl: 'https://instagram.com/street_snap_kr',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
       followers: '28.4K',
       verified: false,
     },
@@ -237,8 +241,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '5시간 전',
     influencer: {
       handle: 'seoul_vibe_fit',
+      nickname: '서울바이브',
       profileUrl: 'https://instagram.com/seoul_vibe_fit',
-      avatarUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
       followers: '63.2K',
       verified: true,
     },
@@ -255,8 +259,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '어제',
     influencer: {
       handle: 'lookbook_jina',
+      nickname: '지나',
       profileUrl: 'https://instagram.com/lookbook_jina',
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
       followers: '77.5K',
       verified: true,
     },
@@ -275,8 +279,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '6분 전',
     influencer: {
       handle: 'beauty_som',
+      nickname: '솜',
       profileUrl: 'https://instagram.com/beauty_som',
-      avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
       followers: '128K',
       verified: true,
     },
@@ -293,8 +297,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '1시간 전',
     influencer: {
       handle: 'beauty_hye',
+      nickname: '혜',
       profileUrl: 'https://instagram.com/beauty_hye',
-      avatarUrl: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=150&auto=format&fit=crop&q=80',
       followers: '31.5K',
       verified: false,
     },
@@ -311,8 +315,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '3시간 전',
     influencer: {
       handle: 'glow_creator_y',
+      nickname: '글로우Y',
       profileUrl: 'https://instagram.com/glow_creator_y',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       followers: '84.0K',
       verified: true,
     },
@@ -329,8 +333,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '4시간 전',
     influencer: {
       handle: 'skin_recipe_m',
+      nickname: '스킨레시피',
       profileUrl: 'https://instagram.com/skin_recipe_m',
-      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
       followers: '42.9K',
       verified: false,
     },
@@ -347,8 +351,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '어제',
     influencer: {
       handle: 'cosmetic_queen',
+      nickname: '코스메틱퀸',
       profileUrl: 'https://instagram.com/cosmetic_queen',
-      avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
       followers: '145K',
       verified: true,
     },
@@ -365,8 +369,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '어제',
     influencer: {
       handle: 'k_beauty_yun',
+      nickname: '윤',
       profileUrl: 'https://instagram.com/k_beauty_yun',
-      avatarUrl: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=150&auto=format&fit=crop&q=80',
       followers: '21.0K',
       verified: false,
     },
@@ -385,8 +389,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '28분 전',
     influencer: {
       handle: 'urban_lookbook',
+      nickname: '어반룩북',
       profileUrl: 'https://instagram.com/urban_lookbook',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
       followers: '89.3K',
       verified: true,
     },
@@ -403,8 +407,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '55분 전',
     influencer: {
       handle: 'daily_look_j',
+      nickname: '제이',
       profileUrl: 'https://instagram.com/daily_look_j',
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
       followers: '62.8K',
       verified: true,
     },
@@ -421,8 +425,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '3시간 전',
     influencer: {
       handle: 'outer_fit_master',
+      nickname: '아우터핏마스터',
       profileUrl: 'https://instagram.com/outer_fit_master',
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
       followers: '73.4K',
       verified: true,
     },
@@ -439,8 +443,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '5시간 전',
     influencer: {
       handle: 'winter_style_k',
+      nickname: '윈터스타일K',
       profileUrl: 'https://instagram.com/winter_style_k',
-      avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
       followers: '35.6K',
       verified: false,
     },
@@ -457,8 +461,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '어제',
     influencer: {
       handle: 'mens_ootd_archive',
+      nickname: '멘즈오오티디',
       profileUrl: 'https://instagram.com/mens_ootd_archive',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
       followers: '18.9K',
       verified: false,
     },
@@ -477,8 +481,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '2시간 전',
     influencer: {
       handle: 'seoul_look_archive',
+      nickname: '서울룩아카이브',
       profileUrl: 'https://instagram.com/seoul_look_archive',
-      avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
       followers: '112K',
       verified: true,
     },
@@ -495,8 +499,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '4시간 전',
     influencer: {
       handle: 'lifestyle_haru',
+      nickname: '라이프스타일하루',
       profileUrl: 'https://instagram.com/lifestyle_haru',
-      avatarUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
       followers: '96.2K',
       verified: true,
     },
@@ -513,8 +517,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '어제',
     influencer: {
       handle: 'wellness_diary',
+      nickname: '웰니스다이어리',
       profileUrl: 'https://instagram.com/wellness_diary',
-      avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
       followers: '48.3K',
       verified: false,
     },
@@ -531,8 +535,8 @@ export const INITIAL_DM_LOGS: DmLog[] = [
     timeAgo: '어제',
     influencer: {
       handle: 'gift_curator_ss',
+      nickname: '기프트큐레이터',
       profileUrl: 'https://instagram.com/gift_curator_ss',
-      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
       followers: '29.7K',
       verified: false,
     },

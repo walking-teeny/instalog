@@ -19,30 +19,27 @@ import {
   MessageCircle,
   ExternalLink
 } from 'lucide-react';
-import { Project, DmLog, DmStatus } from '../types';
+import { Project, DmLog, DmStatus, ProjectType } from '../types';
 
 interface DashboardViewProps {
   projects: Project[];
   logs: DmLog[];
-  isWidgetRecording: boolean;
   onSelectProject: (projectId: string) => void;
   onOpenCreateModal: () => void;
-  onOpenSimulator: () => void;
   onNavigateToLogs?: (status?: 'all' | DmStatus) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   projects,
   logs,
-  isWidgetRecording,
   onSelectProject,
   onOpenCreateModal,
-  onOpenSimulator,
   onNavigateToLogs,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'최신 생성순' | '최신 업데이트순'>('최신 생성순');
+  const [sortBy, setSortBy] = useState<'최신 생성순' | '최신 업데이트순'>('최신 업데이트순');
   const [filterStatus, setFilterStatus] = useState<'전체' | '진행 중' | '종료'>('전체');
+  const [filterType, setFilterType] = useState<'전체' | ProjectType>('전체');
 
   // Derive stats directly from `logs` to strictly unify with "DM 자동 수집 로그"
   const logStats = useMemo(() => {
@@ -76,7 +73,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const totalSent = pLogs.length;
       const waitingCount = pLogs.filter((l) => l.status === 'waiting').length;
       const inTalksCount = pLogs.filter((l) => l.status === 'in_talks').length;
-      const repliedCount = pLogs.filter((l) => l.status !== 'waiting').length;
+      const repliedCount = pLogs.filter((l) => l.status !== 'waiting' && l.status !== '').length;
       const confirmedCount = pLogs.filter((l) => l.status === 'confirmed').length;
       const latest = pLogs[0];
       const latestLog = latest
@@ -126,29 +123,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       result = result.filter((p) => p.status === 'completed' || p.status === 'paused');
     }
 
+    if (filterType !== '전체') {
+      result = result.filter((p) => p.projectType === filterType);
+    }
+
     if (sortBy === '최신 생성순') {
       result.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     } else if (sortBy === '최신 업데이트순') {
-      result.sort((a, b) => {
-        const timeA = a.latestLog?.timeAgo || '999시간 전';
-        const timeB = b.latestLog?.timeAgo || '999시간 전';
-        
-        // Simple heuristic: assuming "X분 전", "X시간 전" format in timeAgo string for sorting.
-        // For accurate robust sorting, timestamp objects/strings should be used.
-        // Since we only have timeAgo, this is a basic approximation for demo.
-        const parseTimeAgo = (ta: string) => {
-          if (ta.includes('분')) return parseInt(ta) || 999;
-          if (ta.includes('시간')) return (parseInt(ta) || 999) * 60;
-          if (ta.includes('일')) return (parseInt(ta) || 999) * 60 * 24;
-          return 999999;
-        };
-        
-        return parseTimeAgo(timeA) - parseTimeAgo(timeB);
-      });
+      result.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
     }
 
     return result;
-  }, [enrichedProjects, searchTerm, filterStatus, sortBy]);
+  }, [enrichedProjects, searchTerm, filterStatus, filterType, sortBy]);
 
   // 무한 스크롤 상태 및 로직
   const [visibleCount, setVisibleCount] = useState(10);
@@ -156,7 +142,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   useEffect(() => {
     setVisibleCount(10);
-  }, [searchTerm, filterStatus, sortBy]);
+  }, [searchTerm, filterStatus, filterType, sortBy]);
 
   const lastElementRef = useCallback((node: HTMLDivElement | null) => {
     if (observer.current) observer.current.disconnect();
@@ -191,7 +177,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-black tracking-tight text-[#111827]">
-            프로젝트 대시보드
+            대시보드
           </h1>
         </div>
         <button
@@ -237,7 +223,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </p>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-black text-[#111827] font-mono">{logStats.waiting}</span>
+              <span className="text-xl sm:text-2xl font-black text-blue-600 font-mono">{logStats.waiting}</span>
               <span className="text-[11px] font-bold text-slate-500">건</span>
             </div>
           </div>
@@ -288,10 +274,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-bold text-[#111827]">
-              진행 중인 프로젝트
+              프로젝트 목록
             </h2>
             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-              {filteredProjects.length}개 운영 중
+              총 {filteredProjects.length}개
             </span>
           </div>
         </div>
@@ -305,7 +291,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <input
                 id="search-projects-input"
                 type="text"
-                placeholder="프로젝트명, 브랜드 검색..."
+                placeholder="프로젝트 이름 검색"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-8 pr-3 py-2 text-xs bg-white border border-[#e2e8f0] rounded-xl placeholder:text-slate-400 focus:outline-none focus:border-[#00c73c]"
@@ -329,9 +315,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onChange={(e) => setFilterStatus(e.target.value as '전체' | '진행 중' | '종료')}
                 className="appearance-none pl-7 pr-8 py-2 text-xs bg-white border border-[#e2e8f0] rounded-xl text-slate-700 font-medium focus:outline-none focus:border-[#00c73c] cursor-pointer"
               >
-                <option value="전체">전체</option>
+                <option value="전체">상태</option>
                 <option value="진행 중">진행 중</option>
                 <option value="종료">종료</option>
+              </select>
+              <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Project Type Filter */}
+            <div className="relative">
+              <select
+                id="filter-project-type-select"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as '전체' | ProjectType)}
+                className="appearance-none pl-7 pr-8 py-2 text-xs bg-white border border-[#e2e8f0] rounded-xl text-slate-700 font-medium focus:outline-none focus:border-[#00c73c] cursor-pointer"
+              >
+                <option value="전체">유형</option>
+                <option value="공동구매">공동구매</option>
+                <option value="협찬">협찬</option>
+                <option value="광고">광고</option>
+                <option value="기타">기타</option>
               </select>
               <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -352,14 +355,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="space-y-3">
           {displayedProjects.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-2xl border border-[#e2e8f0]">
-              <Layers className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm font-bold text-slate-700">일치하는 프로젝트가 없습니다.</p>
-              <p className="text-xs text-slate-400 mt-1">새 프로젝트를 생성하거나 검색 조건을 변경해 보세요.</p>
+              <p className="text-sm font-bold text-slate-700">프로젝트가 없습니다.</p>
               <button
                 onClick={onOpenCreateModal}
                 className="mt-4 px-4 py-2 bg-[#00c73c] text-white text-xs font-bold rounded-xl cursor-pointer"
               >
-                + 첫 프로젝트 만들기
+                + 첫 프로젝트 시작하기
               </button>
             </div>
           ) : (
@@ -374,7 +375,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   key={project.id}
                   id={`project-card-${project.id}`}
                   ref={isLast ? lastElementRef : null}
-                  className="relative bg-white rounded-2xl border border-[#e2e8f0] p-5 hover:border-emerald-400 hover:shadow-md transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-3"
+                  onClick={() => onSelectProject(project.id)}
+                  className="relative bg-white rounded-2xl border border-[#e2e8f0] p-5 hover:border-emerald-400 hover:shadow-md transition-all flex flex-col gap-3 cursor-pointer"
                 >
                   {/* Top-Right Detail Button (Text Style) */}
                   <button
@@ -388,8 +390,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   {/* Left info */}
                   <div className="flex items-start gap-4 min-w-[320px]">
+                    <div>
+                    <p className="text-[11px] text-slate-400 font-medium mb-0.5">{project.projectType}</p>
                     <div className="flex items-center gap-2">
-                      <h3 
+                      <h3
                         onClick={() => onSelectProject(project.id)}
                         className="text-[18px] font-extrabold text-[#111827] hover:text-emerald-600 cursor-pointer transition-colors"
                       >
@@ -404,6 +408,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       >
                         {project.status === 'active' || project.status === 'waiting' ? '진행 중' : '종료'}
                       </span>
+                    </div>
                     </div>
                   </div>
 

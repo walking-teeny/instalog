@@ -20,10 +20,11 @@ export interface Project {
     timeAgo: string;
   };
   createdAt: string;
+  updatedAt: string;
   description?: string;
 }
 
-export type DmStatus = 'waiting' | 'in_talks' | 'confirmed' | 'rejected';
+export type DmStatus = 'waiting' | 'in_talks' | 'confirmed' | 'rejected' | '';
 
 export type ContactChannel = 'none' | 'email' | 'inpock' | 'email_inpock';
 
@@ -35,8 +36,8 @@ export interface DmLog {
   timeAgo: string;
   influencer: {
     handle: string;
+    nickname: string;
     profileUrl: string;
-    avatarUrl?: string;
     followers: string;
     verified: boolean;
   };

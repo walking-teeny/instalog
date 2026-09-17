@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>InstaLog</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect>
+        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+        <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line>
+      </svg>
+    </div>
+    <span class="title">InstaLog</span>
+    <button id="accountBtn" class="account-btn" hidden>
+      <svg class="account-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+      <span id="accountUsername"></span>
+    </button>
+  </div>
+
+  <div id="loginView" class="view">
+    <label>아이디</label>
+    <input id="loginUsername" type="text" autocomplete="username" />
+    <label>비밀번호</label>
+    <input id="loginPassword" type="password" autocomplete="current-password" />
+    <p id="loginError" class="error"></p>
+    <button id="loginBtn" class="primary">로그인</button>
+  </div>
+
+  <div id="mainView" class="view">
+    <label class="label-light">프로젝트 선택</label>
+    <div class="select-wrapper">
+      <select id="projectSelect"></select>
+      <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m6 9 6 6 6-6"></path>
+      </svg>
+    </div>
+
+    <div class="toggle-row">
+      <button id="recordingToggleBtn" class="recording-btn">
+        <svg id="recordingIcon" class="recording-icon" viewBox="0 0 24 24" fill="currentColor"></svg>
+        <span id="recordingBtnText"></span>
+      </button>
+      <button id="openBatchBtn" class="secondary">빈 데이터 채우기</button>
+    </div>
+
+    <p class="hint">인스타그램 DM 발송 내역을 자동으로 기록합니다.</p>
+    <p id="recordingError" class="error"></p>
+  </div>
+
+  <div id="logoutConfirmModal" class="modal-overlay">
+    <div class="modal-box">
+      <p class="modal-text">로그아웃하시겠습니까?</p>
+      <div class="modal-actions">
+        <button id="logoutCancelBtn" class="secondary">취소</button>
+        <button id="logoutConfirmBtn" class="danger">로그아웃</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

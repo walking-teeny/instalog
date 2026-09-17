@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>빈 데이터 채우기</title>
+<style>
+  body {
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    padding: 24px;
+    max-width: 560px;
+    color: #222;
+  }
+  h1 { font-size: 18px; margin-bottom: 8px; }
+  p { font-size: 13px; color: #555; line-height: 1.5; }
+  button {
+    padding: 8px 18px;
+    margin-right: 8px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background: #f7f7f7;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #startBtn { background: #00c73c; color: #fff; border-color: #00c73c; }
+  #status {
+    margin: 16px 0;
+    font-weight: bold;
+    font-size: 14px;
+  }
+  #log {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px 12px;
+    height: 260px;
+    overflow-y: auto;
+    font-size: 12px;
+    color: #555;
+    background: #fafafa;
+  }
+  #log div { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+  <h1>빈 데이터 채우기</h1>
+  <p>
+    누락된 데이터(계정 닉네임, 팔로워 수)를 다시 불러와요.<br>
+    이 탭을 닫으면 작업이 중단되니, 탭을 닫지 말고 유지해주세요.
+  </p>
+  <button id="startBtn">시작</button>
+  <button id="stopBtn" disabled>중지</button>
+  <div id="status">대기 중</div>
+  <div id="log"></div>
+  <script src="config.js"></script>
+  <script src="batch.js"></script>
+</body>
+</html>

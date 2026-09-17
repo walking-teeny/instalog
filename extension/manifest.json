@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "InstaLog",
+  "version": "1.0",
+  "description": "인스타그램 웹에서 DM을 보내면, 상대 계정 정보를 자동으로 읽어 InstaLog 앱에 기록합니다.",
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.instagram.com/*",
+    "http://localhost:8787/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "InstaLog"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.instagram.com/direct/*"
+      ],
+      "js": [
+        "config.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.instagram.com/*"
+      ],
+      "js": [
+        "config.js",
+        "profile_watcher.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://localhost:8787/*",
+        "http://127.0.0.1:3000/*",
+        "http://127.0.0.1:8787/*"
+      ],
+      "js": [
+        "app_bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
