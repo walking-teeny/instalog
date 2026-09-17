@@ -58,12 +58,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50/70 border border-slate-200">
-                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
-                  <User className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[11px] text-slate-400 font-medium">아이디</p>
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold text-slate-500">계정 정보</p>
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50/70 border border-slate-200">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
                   <p className="text-sm font-bold text-[#111827]">{username || '알 수 없음'}</p>
                 </div>
               </div>
