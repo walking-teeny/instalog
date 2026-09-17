@@ -130,7 +130,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
                   </li>
                 ))}
               </ol>
-              <p className="mt-4 pl-1 text-xs font-bold text-black">인스타그램 DM 발송 내역 자동 기록을 시작합니다.</p>
+              <p className="mt-4 pl-1 text-xs font-bold text-slate-500">인스타그램 DM 발송 내역 자동 기록을 시작합니다.</p>
             </div>
           </>
         )}
