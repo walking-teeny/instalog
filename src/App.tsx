@@ -257,13 +257,20 @@ export default function App() {
             </span>
           )}
         </div>
-        <button
-          onClick={() => setIsSettingsModalOpen(true)}
-          className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-          title="인스타그램과 연동하세요"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setIsSettingsModalOpen(true)}
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+          {!isSettingsModalOpen && (
+            <div className="absolute top-full right-0 mt-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-medium shadow-lg z-10">
+              <div className="absolute -top-1 right-3.5 w-2 h-2 bg-slate-800 rotate-45" />
+              인스타그램과 연동하세요
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="flex flex-1 min-h-0">
