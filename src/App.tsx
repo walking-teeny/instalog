@@ -109,6 +109,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isAuthed]);
 
+  // Poll projects/logs so DMs the Chrome extension records show up without a manual refresh.
+  useEffect(() => {
+    if (!isAuthed) return;
+    const interval = setInterval(() => {
+      Promise.all([api.getProjects(), api.getLogs()])
+        .then(([p, l]) => {
+          setProjects(p);
+          setLogs(l);
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isAuthed]);
+
   // Project handlers
   const handleCreateProject = (
     newProjectData: Omit<Project, 'id' | 'totalSent' | 'repliedCount' | 'confirmedCount' | 'createdAt' | 'updatedAt'>
