@@ -49,7 +49,15 @@ async function apiFetch_(path, token, options = {}) {
 async function getAppAccountUsername_() {
   const tabs = await new Promise((resolve) =>
     chrome.tabs.query(
-      { url: ['http://localhost:3000/*', 'http://localhost:8787/*', 'http://127.0.0.1:3000/*', 'http://127.0.0.1:8787/*'] },
+      {
+        url: [
+          'https://instalog-nu.vercel.app/*',
+          'http://localhost:3000/*',
+          'http://localhost:8787/*',
+          'http://127.0.0.1:3000/*',
+          'http://127.0.0.1:8787/*',
+        ],
+      },
       resolve
     )
   );

@@ -9,6 +9,7 @@
   ],
   "host_permissions": [
     "https://www.instagram.com/*",
+    "https://instalog-nu.vercel.app/*",
     "http://localhost:8787/*"
   ],
   "background": {
@@ -44,6 +45,7 @@
     },
     {
       "matches": [
+        "https://instalog-nu.vercel.app/*",
         "http://localhost:3000/*",
         "http://localhost:8787/*",
         "http://127.0.0.1:3000/*",
