@@ -222,6 +222,15 @@ export default function App() {
     setIsAuthed(false);
   };
 
+  const handleOpenSettings = () => {
+    setIsSettingsModalOpen(true);
+    if (widgetSettings && !widgetSettings.hasOpenedSettings) {
+      const updated = { ...widgetSettings, hasOpenedSettings: true };
+      setWidgetSettings(updated);
+      api.updateWidgetSettings(updated).catch(console.error);
+    }
+  };
+
   if (!isAuthed) {
     return <LoginView onLoginSuccess={() => setIsAuthed(true)} />;
   }
@@ -259,12 +268,12 @@ export default function App() {
         </div>
         <div className="relative">
           <button
-            onClick={() => setIsSettingsModalOpen(true)}
+            onClick={handleOpenSettings}
             className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <Settings className="w-4 h-4" />
           </button>
-          {!isSettingsModalOpen && (
+          {!isSettingsModalOpen && !widgetSettings.hasOpenedSettings && (
             <div className="absolute top-full right-0 mt-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-medium shadow-lg z-10">
               <div className="absolute -top-1 right-3.5 w-2 h-2 bg-slate-800 rotate-45" />
               인스타그램과 연동하세요

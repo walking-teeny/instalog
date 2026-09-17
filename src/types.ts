@@ -55,4 +55,5 @@ export interface WidgetSettings {
   port: string;
   todayLogsCount: number;
   lastPing: string;
+  hasOpenedSettings: boolean;
 }

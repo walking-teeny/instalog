@@ -55,6 +55,8 @@ async function migrate() {
       "todayLogsCount" INTEGER NOT NULL,
       "lastPing" TEXT NOT NULL
     );
+
+    ALTER TABLE widget_settings ADD COLUMN IF NOT EXISTS "hasOpenedSettings" BOOLEAN NOT NULL DEFAULT false;
   `);
 }
 

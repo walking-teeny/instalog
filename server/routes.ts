@@ -262,10 +262,11 @@ apiRouter.get(
         port: '',
         todayLogsCount: 0,
         lastPing: '',
+        hasOpenedSettings: false,
       };
       await db.query(
-        `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing", "hasOpenedSettings")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [
           row.userId,
           row.isRecording,
@@ -275,6 +276,7 @@ apiRouter.get(
           row.port,
           row.todayLogsCount,
           row.lastPing,
+          row.hasOpenedSettings,
         ]
       );
     }
@@ -288,11 +290,21 @@ apiRouter.put(
   ah(async (req, res) => {
     const s = req.body;
     await db.query(
-      `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing", "hasOpenedSettings")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT ("userId") DO UPDATE SET
-         "isRecording"=$2, "selectedProjectId"=$3, "pairingAccount"=$4, "latencyMs"=$5, port=$6, "todayLogsCount"=$7, "lastPing"=$8`,
-      [req.userId, !!s.isRecording, s.selectedProjectId, s.pairingAccount, s.latencyMs, s.port, s.todayLogsCount, s.lastPing]
+         "isRecording"=$2, "selectedProjectId"=$3, "pairingAccount"=$4, "latencyMs"=$5, port=$6, "todayLogsCount"=$7, "lastPing"=$8, "hasOpenedSettings"=$9`,
+      [
+        req.userId,
+        !!s.isRecording,
+        s.selectedProjectId,
+        s.pairingAccount,
+        s.latencyMs,
+        s.port,
+        s.todayLogsCount,
+        s.lastPing,
+        !!s.hasOpenedSettings,
+      ]
     );
     res.json(s);
   })
