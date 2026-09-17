@@ -74,7 +74,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
                   <a
                     href="/instalog-extension.zip"
                     download
-                    className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 bg-[#00c73c] hover:bg-[#00b035] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm shadow-[#00c73c]/30"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>프로그램 설치</span>
