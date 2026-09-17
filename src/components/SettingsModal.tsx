@@ -69,7 +69,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
               </div>
 
               <div className="space-y-2">
-                <p className="text-[11px] font-bold text-slate-500">Chrome 확장 프로그램</p>
+                <p className="text-[11px] font-bold text-slate-500">인스타그램 연동</p>
                 <div className="flex items-center gap-2">
                   <a
                     href="/instalog-extension.zip"
@@ -77,7 +77,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
                     className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 bg-[#00c73c] hover:bg-[#00b035] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm shadow-[#00c73c]/30"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>프로그램 설치</span>
+                    <span>연동 프로그램 설치</span>
                   </a>
                   <button
                     onClick={() => setView('guide')}
