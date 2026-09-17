@@ -113,7 +113,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <h2 className="text-sm font-bold text-[#111827] flex-1">설치 가이드</h2>
+              <h2 className="text-sm font-bold text-[#111827] flex-1">설치 및 사용 가이드</h2>
               <button
                 onClick={handleClose}
                 className="p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
@@ -123,7 +123,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, username, 
             </div>
 
             <div className="p-6 max-h-[70vh] overflow-y-auto">
-              <h3 className="text-sm font-bold text-[#111827] mb-4">Chrome 확장 프로그램 설치 및 사용 가이드</h3>
               <ol className="space-y-2.5 list-decimal list-inside">
                 {GUIDE_STEPS.map((step, i) => (
                   <li key={i} className="text-xs text-slate-700 leading-relaxed pl-1">
