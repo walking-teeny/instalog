@@ -49,6 +49,9 @@
       "matches": [
         "https://www.instagram.com/*"
       ],
+      "exclude_matches": [
+        "https://www.instagram.com/direct/*"
+      ],
       "js": [
         "config.js",
         "profile_watcher.js"

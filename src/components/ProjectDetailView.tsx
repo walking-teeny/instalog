@@ -11,12 +11,16 @@ import {
   Trash2,
   ChevronDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ArrowUpDown
 } from 'lucide-react';
 import { Project, DmLog, DmStatus, ContactChannel, ProjectType } from '../types';
+import { DM_STATUS_LABELS, CONTACT_CHANNEL_LABELS, OS_PIPELINE_OPTIONS } from '../constants';
+import { StatusFilterBar, computeStatusCounts } from './StatusFilterBar';
+import { StatusSelect } from './StatusSelect';
 
 const COL_WIDTHS_STORAGE_KEY = 'instalog_project_log_col_widths';
-const DEFAULT_COL_WIDTHS = [110, 200, 110, 120, 70, 280, 40];
+const DEFAULT_COL_WIDTHS = [110, 200, 110, 120, 70, 280, 90, 40];
 
 const loadColWidths = (): number[] => {
   try {
@@ -68,6 +72,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | DmStatus>('all');
   const [channelFilter, setChannelFilter] = useState<'all' | ContactChannel>('all');
   const [secondMessageFilter, setSecondMessageFilter] = useState<'all' | 'sent' | 'not_sent'>('all');
+  const [updatedAtSort, setUpdatedAtSort] = useState<'asc' | 'desc'>('desc');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editName, setEditName] = useState(project.name);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -119,15 +124,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     return logs.filter((l) => l.projectId === project.id);
   }, [logs, project.id]);
 
-  const statusCounts = useMemo(() => {
-    return {
-      all: projectLogs.length,
-      waiting: projectLogs.filter((l) => l.status === 'waiting' || l.status === '').length,
-      in_talks: projectLogs.filter((l) => l.status === 'in_talks').length,
-      rejected: projectLogs.filter((l) => l.status === 'rejected').length,
-      confirmed: projectLogs.filter((l) => l.status === 'confirmed').length,
-    };
-  }, [projectLogs]);
+  const statusCounts = useMemo(() => computeStatusCounts(projectLogs), [projectLogs]);
 
   const filteredLogs = useMemo(() => {
     let result = [...projectLogs];
@@ -168,11 +165,21 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     return result;
   }, [projectLogs, statusFilter, searchTerm, channelFilter, secondMessageFilter, dateFrom, dateTo]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
+  const sortedLogs = useMemo(() => {
+    const result = [...filteredLogs];
+    result.sort((a, b) =>
+      updatedAtSort === 'asc'
+        ? a.timestamp.localeCompare(b.timestamp)
+        : b.timestamp.localeCompare(a.timestamp)
+    );
+    return result;
+  }, [filteredLogs, updatedAtSort]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedLogs.length / itemsPerPage));
   const paginatedLogs = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
-    return filteredLogs.slice(start, start + itemsPerPage);
-  }, [filteredLogs, currentPage, itemsPerPage]);
+    return sortedLogs.slice(start, start + itemsPerPage);
+  }, [sortedLogs, currentPage, itemsPerPage]);
 
   const handleSaveProjectInfo = () => {
     if (!editName.trim()) return;
@@ -194,35 +201,29 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
   const exportProjectExcel = (scope: 'page' | 'all') => {
     const targetLogs = scope === 'page' ? paginatedLogs : projectLogs;
     const headers = [
-      '로그ID',
-      '발송일시',
-      '인플루언서 아이디',
-      '프로필 링크',
-      '팔로워',
-      '진행 상태',
-      '기타 연락 수단',
-      '2차 발송',
+      '최근 업데이트 일시',
+      '팔로워수',
+      '계정 ID',
+      '계정 닉네임',
+      '계정 링크',
+      '소통 상태',
+      '기타 소통 수단',
+      '2차 발송 여부',
       '메모',
+      '담당자',
     ];
 
-    const statusMap: Record<DmStatus, string> = {
-      waiting: '회신 대기',
-      in_talks: '소통 중',
-      confirmed: '협업 성사',
-      rejected: '거절',
-      '': '회신 대기',
-    };
-
     const rows = targetLogs.map((log) => [
-      log.id,
       log.timestamp,
-      `@${log.influencer.handle}`,
-      log.influencer.profileUrl,
       log.influencer.followers,
-      statusMap[log.status],
-      log.channel,
-      log.secondMessageSent ? '완료' : '미발송',
+      `@${log.influencer.handle}`,
+      log.influencer.nickname || '',
+      log.influencer.profileUrl,
+      DM_STATUS_LABELS[log.status],
+      CONTACT_CHANNEL_LABELS[log.channel],
+      log.secondMessageSent ? '발송 완료' : '미발송',
       log.memo || '',
+      log.profileName || '',
     ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -277,9 +278,9 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       {/* Project Banner & Quick Editor */}
       <div className="space-y-6" style={{ marginBottom: '16px' }}>
         <div className="space-y-1.5">
-            <div className="flex items-center">
+            <div className="flex items-center gap-0.5">
               {/* Quick status switch */}
-              <div className="relative flex items-center gap-2 bg-slate-50 py-2 pr-2 rounded-2xl shrink-0 mr-1">
+              <div className="relative flex items-center gap-2 bg-slate-50 py-2 pr-2 rounded-2xl shrink-0">
                 <select
                   value={project.status === 'active' || project.status === 'waiting' ? 'active' : 'completed'}
                   onChange={(e) => {
@@ -309,7 +310,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
               </div>
 
               {/* Project type */}
-              <div className="relative flex items-center gap-2 bg-slate-50 py-2 pr-2 rounded-2xl shrink-0 mr-2">
+              <div className="relative flex items-center gap-2 bg-slate-50 py-2 pr-2 rounded-2xl shrink-0">
                 <select
                   value={project.projectType}
                   onChange={(e) => {
@@ -324,6 +325,35 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                   <option value="협찬">협찬</option>
                   <option value="광고">광고</option>
                   <option value="기타">기타</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* 본부 OS 파이프라인 연동 */}
+              <div className="relative flex items-center gap-2 bg-slate-50 py-2 pr-2 rounded-2xl shrink-0">
+                <select
+                  value={project.osPipeline || ''}
+                  onChange={(e) => {
+                    onUpdateProject({
+                      ...project,
+                      osPipeline: e.target.value,
+                    });
+                  }}
+                  title="본부 OS의 파이프라인 이름과 정확히 같은 값만 고를 수 있어, 오타로 새 파이프라인이 생기지 않습니다."
+                  className="appearance-none text-xs font-bold bg-white border border-slate-200 rounded-xl pl-3 pr-8 py-1.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="">본부 OS 미연동</option>
+                  {/* 저장된 값이 현재 목록에 없으면(본부 OS에서 이름이 바뀌었거나 없어짐) 빈칸으로
+                      숨기지 않고 그대로 보여준다 — 안 그러면 "미연동"으로 착각해 실제로 유효한
+                      값을 다른 파이프라인으로 조용히 덮어써버릴 수 있다. */}
+                  {project.osPipeline && !OS_PIPELINE_OPTIONS.includes(project.osPipeline) && (
+                    <option value={project.osPipeline}>{project.osPipeline} (목록에 없음)</option>
+                  )}
+                  {OS_PIPELINE_OPTIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -390,81 +420,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       {/* Detail Table Header & Controls */}
       <div className="space-y-4">
         {/* Status Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'all'
-                ? 'bg-[#00c73c] text-white shadow-sm border-[#00c73c]'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span>전체 로그</span>
-            <span className={`text-[11px] px-1.5 py-0.2 rounded-full ${statusFilter === 'all' ? 'bg-black/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
-              {statusCounts.all}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('waiting')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'waiting'
-                ? 'bg-blue-600 text-white shadow-sm border-blue-600'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-            <span>회신 대기</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.waiting}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('in_talks')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'in_talks'
-                ? 'bg-amber-500 text-white shadow-sm border-amber-500'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            <span>소통 중</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.in_talks}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('rejected')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'rejected'
-                ? 'bg-rose-500 text-white shadow-sm border-rose-500'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-            <span>거절</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.rejected}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('confirmed')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'confirmed'
-                ? 'bg-emerald-600 text-white shadow-sm border-emerald-600'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span>협업 성사</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.confirmed}
-            </span>
-          </button>
-        </div>
+        <StatusFilterBar value={statusFilter} onChange={setStatusFilter} counts={statusCounts} />
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
@@ -562,10 +518,22 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                   '기타 소통 수단',
                   '2차 발송',
                   '메모',
+                  '담당자',
                   '',
                 ].map((label, i) => (
                   <th key={i} className="py-3 px-4 relative overflow-hidden text-ellipsis whitespace-nowrap">
-                    {label}
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {i === 0 && (
+                        <button
+                          onClick={() => setUpdatedAtSort((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                          className="text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer"
+                          title="최근 업데이트 정렬"
+                        >
+                          <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      )}
+                    </span>
                     <span
                       onMouseDown={handleResizeStart(i)}
                       className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-emerald-400/50 select-none"
@@ -577,8 +545,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             <tbody className="divide-y divide-[#f1f5f9]">
               {paginatedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    등록된 DM 발송 기록이 없습니다. 크롬 확장 프로그램으로 DM을 발송하거나 수기로 등록해 보세요.
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    데이터가 없습니다.
                   </td>
                 </tr>
               ) : (
@@ -599,39 +567,17 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         >
                           @{log.influencer.handle}
                         </a>
-                        <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">{log.influencer.nickname || log.influencer.handle}</p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-1 truncate">
+                        <p className="text-[13.2px] text-slate-500 font-medium mt-1 truncate">{log.influencer.nickname || log.influencer.handle}</p>
+                        <p className="text-[12px] text-slate-400 font-mono mt-1 truncate">
                           팔로워 {log.influencer.followers}
                         </p>
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <div className="relative">
-                          <select
-                            value={log.status || 'waiting'}
-                            onChange={(e) => {
-                              onUpdateLog({
-                                ...log,
-                                status: e.target.value as DmStatus,
-                              });
-                            }}
-                            className={`w-full appearance-none text-xs font-bold pl-0 pr-4 py-1 rounded-lg cursor-pointer focus:outline-none ${
-                              log.status === 'confirmed'
-                                ? 'text-emerald-700'
-                                : log.status === 'in_talks'
-                                ? 'text-amber-800'
-                                : log.status === 'rejected'
-                                ? 'text-rose-700'
-                                : 'text-blue-700'
-                            }`}
-                          >
-                            <option value="waiting">회신 대기</option>
-                            <option value="in_talks">소통 중</option>
-                            <option value="confirmed">협업 성사</option>
-                            <option value="rejected">거절</option>
-                          </select>
-                          <ChevronDown className="w-3 h-3 text-slate-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        </div>
+                        <StatusSelect
+                          status={log.status}
+                          onChange={(status) => onUpdateLog({ ...log, status })}
+                        />
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -691,7 +637,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                                 onUpdateLog({ ...log, memo: tempMemo });
                                 setEditingMemoId(null);
                               }}
-                              className="px-2 py-1 bg-emerald-500 text-white rounded text-[11px] font-bold"
+                              className="px-2 py-1 bg-emerald-500 text-white rounded text-[13.2px] font-bold"
                             >
                               저장
                             </button>
@@ -709,6 +655,17 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                             </span>
                             <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 ml-1" />
                           </div>
+                        )}
+                      </td>
+
+                      {/* 담당자 */}
+                      <td className="py-3.5 px-4">
+                        {log.profileName ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold text-[11px] truncate max-w-full">
+                            {log.profileName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
                         )}
                       </td>
 
@@ -853,7 +810,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 }`}
               >
                 <p className="text-xs font-bold text-[#111827]">현재 페이지에 표시되는 데이터만</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">선택한 페이지 및 적용된 필터의 결과만 다운로드합니다.</p>
+                <p className="text-[13.2px] text-slate-400 mt-0.5">선택한 페이지 및 적용된 필터의 결과만 다운로드합니다.</p>
               </button>
               <button
                 onClick={() => setExportScope('all')}
@@ -864,7 +821,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 }`}
               >
                 <p className="text-xs font-bold text-[#111827]">이 프로젝트의 모든 데이터</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">이 프로젝트의 모든 데이터를 다운로드합니다.</p>
+                <p className="text-[13.2px] text-slate-400 mt-0.5">이 프로젝트의 모든 데이터를 다운로드합니다.</p>
               </button>
             </div>
             <div className="flex items-center justify-end gap-2.5 pt-2">

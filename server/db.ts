@@ -57,6 +57,23 @@ async function migrate() {
     );
 
     ALTER TABLE widget_settings ADD COLUMN IF NOT EXISTS "hasOpenedSettings" BOOLEAN NOT NULL DEFAULT false;
+
+    -- NULL = not yet pushed to 본부 OS as a deal; set once server/mark-deals-synced.ts
+    -- confirms the add_deal call succeeded. New rows default to NULL automatically.
+    ALTER TABLE dm_logs ADD COLUMN IF NOT EXISTS "osSyncedAt" TIMESTAMPTZ;
+
+    -- Which profile (picked on the OTT-style profile screen after login) entered this log.
+    ALTER TABLE dm_logs ADD COLUMN IF NOT EXISTS "profileName" TEXT NOT NULL DEFAULT '';
+
+    -- Which 본부 OS 파이프라인 this project's dm_logs become deals in (see find-unsynced-deals.ts).
+    -- NULL/empty = not connected yet, so its logs sit in "unmapped" instead of silently guessing.
+    ALTER TABLE projects ADD COLUMN IF NOT EXISTS "osPipeline" TEXT;
+
+    -- Profile names (per this account) that have dismissed the "인스타그램과 연동하세요" tooltip.
+    -- Server-persisted (not localStorage) so dismissal survives across devices/browsers,
+    -- same guarantee "hasOpenedSettings" used to give before it was replaced by this,
+    -- but now scoped per profile instead of per account. JSON array of profile-name strings.
+    ALTER TABLE widget_settings ADD COLUMN IF NOT EXISTS "dismissedTooltipProfiles" TEXT NOT NULL DEFAULT '[]';
   `);
 }
 

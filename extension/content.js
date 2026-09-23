@@ -161,17 +161,10 @@ function isSendButtonClick(el) {
   return /보내기|Send/i.test(label);
 }
 
-/** "YYYY-MM-DD HH:MM:SS" 형식 타임스탬프 (InstaLog 앱과 동일한 형식) */
-function nowTimestamp_() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-
 function getSettings_() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['instalogToken', 'instalogRecording', 'instalogProjectId', 'instalogProjectName'],
+      ['instalogToken', 'instalogRecording', 'instalogProjectId', 'instalogProjectName', 'instalogProfileName'],
       (data) => resolve(data)
     );
   });
@@ -212,21 +205,25 @@ async function handleDmSent() {
 
   showToast('📋 "' + (displayName || username) + '" 계정 정보를 확인하는 중...');
 
-  const timestamp = nowTimestamp_();
+  const timestamp = ilNowTimestamp();
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
   try {
-    const existing = await findExistingLog_(settings, username);
+    const existing = await ilFindExistingLog(settings.instalogToken, settings.instalogProjectId, username);
 
     if (existing) {
       // 이미 기록된 계정이면 중복으로 새 줄을 만들지 않고, 최근 업데이트 시각만 갱신합니다.
       const diffMs = Date.now() - new Date(existing.timestamp.replace(' ', 'T')).getTime();
       const shouldMarkSecondMessage = diffMs >= THREE_DAYS_MS;
+      // "리스트업"(DM 이전 단계)에 머물러 있던 계정이면, 실제로 DM을 보낸 지금은
+      // "회신 대기"로 올려야 한다 — 이미 그보다 앞서간 상태(소통 중/성사/거절)는 건드리지 않는다.
+      const shouldAdvancePastListUp = existing.status === 'list_up' || existing.status === '';
 
       const updatedLog = {
         ...existing,
         timestamp,
         timeAgo: '방금',
+        status: shouldAdvancePastListUp ? 'waiting' : existing.status,
         secondMessageSent: existing.secondMessageSent || shouldMarkSecondMessage,
       };
 
@@ -241,7 +238,10 @@ async function handleDmSent() {
       if (res.status === 401) return handleUnauthorized_();
       if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
 
-      await bumpProjectStats_(settings, updatedLog, { incrementTotalSent: false });
+      await ilBumpProjectStats(settings.instalogToken, settings.instalogProjectId, updatedLog, {
+        action: '제안 발송',
+        incrementTotalSent: false,
+      });
 
       console.log(TAG, '기존 로그 업데이트 완료:', updatedLog);
       showToast(
@@ -272,6 +272,7 @@ async function handleDmSent() {
       channel: 'none',
       secondMessageSent: false,
       memo: '',
+      profileName: settings.instalogProfileName || '',
     };
 
     const res = await fetch(`${INSTALOG_API_BASE}/api/logs`, {
@@ -286,7 +287,10 @@ async function handleDmSent() {
     if (res.status === 401) return handleUnauthorized_();
     if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
 
-    await bumpProjectStats_(settings, newLog, { incrementTotalSent: true });
+    await ilBumpProjectStats(settings.instalogToken, settings.instalogProjectId, newLog, {
+      action: '제안 발송',
+      incrementTotalSent: true,
+    });
 
     console.log(TAG, 'DM 로그 등록 완료:', newLog);
     showToast('📨 "' + (newLog.influencer.nickname || newLog.influencer.handle) + '" 계정을 InstaLog에 기록했습니다.');
@@ -299,54 +303,6 @@ async function handleDmSent() {
 function handleUnauthorized_() {
   chrome.storage.local.remove('instalogToken');
   showToast('❌ 로그인이 만료되었습니다. 확장 프로그램 아이콘에서 다시 로그인해주세요.');
-}
-
-/** 같은 프로젝트 안에, 이미 기록되어 있는 이 계정의 로그가 있는지 찾습니다. (있으면 가장 최근 것) */
-async function findExistingLog_(settings, username) {
-  const res = await fetch(`${INSTALOG_API_BASE}/api/logs`, {
-    headers: { Authorization: `Bearer ${settings.instalogToken}` },
-  });
-  if (!res.ok) return null;
-  const logs = await res.json();
-  const matches = logs
-    .filter((l) => l.projectId === settings.instalogProjectId && l.influencer.handle.toLowerCase() === username.toLowerCase())
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  return matches[0] || null;
-}
-
-/** 대시보드 통계(발송 건수/최근 업데이트)가 갱신되도록, 해당 프로젝트도 함께 업데이트합니다. */
-async function bumpProjectStats_(settings, log, { incrementTotalSent }) {
-  try {
-    const res = await fetch(`${INSTALOG_API_BASE}/api/projects`, {
-      headers: { Authorization: `Bearer ${settings.instalogToken}` },
-    });
-    if (!res.ok) return;
-    const projects = await res.json();
-    const project = projects.find((p) => p.id === settings.instalogProjectId);
-    if (!project) return;
-
-    const updated = {
-      ...project,
-      totalSent: incrementTotalSent ? (project.totalSent || 0) + 1 : project.totalSent,
-      latestLog: {
-        handle: `@${log.influencer.handle}`,
-        action: '제안 발송',
-        timeAgo: '방금',
-      },
-      updatedAt: log.timestamp,
-    };
-
-    await fetch(`${INSTALOG_API_BASE}/api/projects/${project.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.instalogToken}`,
-      },
-      body: JSON.stringify(updated),
-    });
-  } catch (err) {
-    console.warn(TAG, '프로젝트 통계 갱신 실패 (로그 자체는 정상 기록됨):', err);
-  }
 }
 
 // Enter 키로 전송하는 경우 감지 (Shift+Enter는 줄바꿈이므로 제외)

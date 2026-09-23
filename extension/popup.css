@@ -195,6 +195,46 @@ button.danger {
   flex: 1;
 }
 
+.listup-btn {
+  width: 100%;
+  padding: 9px;
+  margin-bottom: 14px;
+  background: #fefce8;
+  color: #854d0e;
+  border: 1px solid #fef08a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.listup-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.listup-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.listup-status {
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 3px 0 10px;
+  min-height: 7px;
+  color: #64748b;
+}
+
+.listup-status.is-error {
+  color: #f43f5e;
+}
+
+.listup-status.is-success {
+  color: #00c73c;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;

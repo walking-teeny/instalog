@@ -191,3 +191,106 @@ async function pwRun_() {
 }
 
 pwRun_();
+
+/**
+ * =================================================================
+ * 리스트업 (팝업의 "리스트업" 버튼)
+ * =================================================================
+ * 기록 시작/일시정지 상태와 무관하게, 팝업에서 요청이 오면 현재 프로필 페이지의
+ * 계정 정보를 읽어 InstaLog에 status: 'list_up'으로 기록합니다.
+ * (이미 기록된 계정이면 새 줄을 만들지 않고 최근 업데이트 시각/상태만 갱신합니다)
+ */
+
+async function pwHandleListUp_() {
+  const username = pwExtractUsernameFromPath_(location.pathname);
+  if (!username) return { ok: false, error: '인스타그램 프로필 페이지가 아닙니다.' };
+
+  const { instalogToken, instalogProjectId, instalogProjectName, instalogProfileName } = await new Promise((resolve) =>
+    chrome.storage.local.get(['instalogToken', 'instalogProjectId', 'instalogProjectName', 'instalogProfileName'], resolve)
+  );
+  if (!instalogToken) return { ok: false, error: 'InstaLog에 로그인되어 있지 않습니다.' };
+  if (!instalogProjectId) return { ok: false, error: '기록할 프로젝트가 선택되지 않았습니다.' };
+
+  const followerCount = pwFindFollowerCount_();
+  const formattedFollowers = followerCount !== null ? pwFormatFollowerCount_(followerCount) : '';
+  const displayName = pwFindDisplayName_(username) || '';
+  const timestamp = ilNowTimestamp();
+
+  try {
+    const existing = await ilFindExistingLog(instalogToken, instalogProjectId, username);
+
+    if (existing) {
+      // 이미 한 단계라도 진행된 상태(회신 대기 이상)를 리스트업으로 되돌리지 않도록,
+      // 아직 아무 상태도 안 찍힌 공란일 때만 상태를 리스트업으로 올립니다.
+      // ('회신 대기'는 실제 DM을 보낸 뒤의 상태라 리스트업보다 다음 단계입니다 — content.js 참고)
+      const shouldMarkListUp = existing.status === '';
+      const updatedLog = {
+        ...existing,
+        timestamp,
+        timeAgo: '방금',
+        status: shouldMarkListUp ? 'list_up' : existing.status,
+        influencer: {
+          ...existing.influencer,
+          nickname: existing.influencer.nickname || displayName,
+          followers: existing.influencer.followers || formattedFollowers,
+        },
+      };
+
+      const res = await fetch(`${INSTALOG_API_BASE}/api/logs/${existing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${instalogToken}` },
+        body: JSON.stringify(updatedLog),
+      });
+      if (res.status === 401) { chrome.storage.local.remove('instalogToken'); return { ok: false, error: '로그인이 만료되었습니다. 팝업에서 다시 로그인해주세요.' }; }
+      if (!res.ok) return { ok: false, error: `서버 오류 (${res.status})` };
+
+      await ilBumpProjectStats(instalogToken, instalogProjectId, updatedLog, {
+        action: '리스트업',
+        incrementTotalSent: false,
+      });
+      return { ok: true, username, nickname: updatedLog.influencer.nickname };
+    }
+
+    const newLog = {
+      id: `ext_${Date.now()}`,
+      projectId: instalogProjectId,
+      projectName: instalogProjectName || '',
+      timestamp,
+      timeAgo: '방금',
+      influencer: {
+        handle: username,
+        nickname: displayName,
+        profileUrl: `https://www.instagram.com/${username}/`,
+        followers: formattedFollowers,
+        verified: false,
+      },
+      status: 'list_up',
+      channel: 'none',
+      secondMessageSent: false,
+      memo: '',
+      profileName: instalogProfileName || '',
+    };
+
+    const res = await fetch(`${INSTALOG_API_BASE}/api/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${instalogToken}` },
+      body: JSON.stringify(newLog),
+    });
+    if (res.status === 401) { chrome.storage.local.remove('instalogToken'); return { ok: false, error: '로그인이 만료되었습니다. 팝업에서 다시 로그인해주세요.' }; }
+    if (!res.ok) return { ok: false, error: `서버 오류 (${res.status})` };
+
+    await ilBumpProjectStats(instalogToken, instalogProjectId, newLog, {
+      action: '리스트업',
+      incrementTotalSent: true,
+    });
+    return { ok: true, username, nickname: newLog.influencer.nickname };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== 'INSTALOG_LIST_UP') return;
+  pwHandleListUp_().then(sendResponse);
+  return true; // 비동기 응답
+});

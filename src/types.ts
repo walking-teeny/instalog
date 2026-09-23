@@ -22,9 +22,10 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   description?: string;
+  osPipeline?: string;
 }
 
-export type DmStatus = 'waiting' | 'in_talks' | 'confirmed' | 'rejected' | '';
+export type DmStatus = 'waiting' | 'list_up' | 'in_talks' | 'confirmed' | 'rejected' | '';
 
 export type ContactChannel = 'none' | 'email' | 'inpock' | 'email_inpock';
 
@@ -45,6 +46,7 @@ export interface DmLog {
   channel: ContactChannel;
   secondMessageSent: boolean;
   memo: string;
+  profileName?: string;
 }
 
 export interface WidgetSettings {
@@ -56,4 +58,5 @@ export interface WidgetSettings {
   todayLogsCount: number;
   lastPing: string;
   hasOpenedSettings: boolean;
+  dismissedTooltipProfiles: string[];
 }

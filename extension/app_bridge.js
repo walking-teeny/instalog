@@ -14,22 +14,39 @@
 
 console.debug('[InstaLog] app_bridge.js 로드됨 (탭:', window.location.href, ')');
 
+// 이 스크립트가 (다시) 주입될 때마다 — 페이지 새로고침, 브라우저 재시작 등 — 캐시된
+// chrome.storage.local.instalogProfileName을 앱의 현재 값으로 한 번 맞춰둡니다.
+// INSTALOG_PROFILE_CHANGED 브로드캐스트는 "전환되는 순간" 열려있던 탭에만 전달되므로,
+// 그 순간 이 탭이 없었거나 이후에 새로고침된 경우를 커버하기 위한 보강입니다.
+chrome.storage.local.set({ instalogProfileName: localStorage.getItem('instalog_profile_name') || '' });
+
 // 확장 프로그램(팝업)이 "이 탭의 앱은 어떤 계정으로 로그인되어 있나?" 물어볼 때 응답합니다.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'INSTALOG_GET_APP_ACCOUNT') {
-    sendResponse({ username: localStorage.getItem('instalog_auth_username') || null });
+    sendResponse({
+      username: localStorage.getItem('instalog_auth_username') || null,
+      profileName: localStorage.getItem('instalog_profile_name') || null,
+    });
   }
 });
 
 // 앱 페이지(React)가 "확장 프로그램은 어떤 계정으로 로그인되어 있나?" 물어볼 때 응답합니다.
 window.addEventListener('message', (event) => {
-  if (event.source !== window) return;
-  if (event.data?.source !== 'instalog-app' || event.data?.type !== 'INSTALOG_GET_EXTENSION_ACCOUNT') return;
+  if (event.source !== window || event.data?.source !== 'instalog-app') return;
 
-  chrome.storage.local.get(['instalogUsername'], (data) => {
-    window.postMessage(
-      { source: 'instalog-extension', type: 'INSTALOG_EXTENSION_ACCOUNT_RESULT', username: data.instalogUsername || null },
-      window.location.origin
-    );
-  });
+  if (event.data.type === 'INSTALOG_GET_EXTENSION_ACCOUNT') {
+    chrome.storage.local.get(['instalogUsername'], (data) => {
+      window.postMessage(
+        { source: 'instalog-extension', type: 'INSTALOG_EXTENSION_ACCOUNT_RESULT', username: data.instalogUsername || null },
+        window.location.origin
+      );
+    });
+    return;
+  }
+
+  // 앱에서 프로필을 전환하면(설정 > 프로필 전환), 다음 로그인/기록 시작 시점까지 기다리지 않고
+  // 그 순간부터 자동 기록되는 로그에 바로 새 프로필이 담당자로 찍히도록 즉시 반영합니다.
+  if (event.data.type === 'INSTALOG_PROFILE_CHANGED') {
+    chrome.storage.local.set({ instalogProfileName: event.data.profileName || '' });
+  }
 });

@@ -5,7 +5,7 @@ export type Route =
   | { view: 'logs'; status: 'all' | DmStatus }
   | { view: 'project'; projectId: string };
 
-const VALID_STATUSES: DmStatus[] = ['waiting', 'in_talks', 'confirmed', 'rejected'];
+const VALID_STATUSES: DmStatus[] = ['waiting', 'list_up', 'in_talks', 'confirmed', 'rejected'];
 
 export function parseRoute(): Route {
   const { pathname, search } = window.location;

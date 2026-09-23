@@ -4,9 +4,12 @@ const loginUsername = document.getElementById('loginUsername');
 const loginPassword = document.getElementById('loginPassword');
 const loginError = document.getElementById('loginError');
 const loginBtn = document.getElementById('loginBtn');
+const loginForm = document.getElementById('loginForm');
 const accountBtn = document.getElementById('accountBtn');
 const accountUsername = document.getElementById('accountUsername');
 const projectSelect = document.getElementById('projectSelect');
+const listUpBtn = document.getElementById('listUpBtn');
+const listUpStatus = document.getElementById('listUpStatus');
 const recordingToggleBtn = document.getElementById('recordingToggleBtn');
 const recordingIcon = document.getElementById('recordingIcon');
 const recordingBtnText = document.getElementById('recordingBtnText');
@@ -45,8 +48,8 @@ async function apiFetch_(path, token, options = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-// 앱이 열려있는 탭에서, 앱이 현재 로그인된 계정명을 가져옵니다. (계정 불일치 로그인 방지용)
-async function getAppAccountUsername_() {
+// 앱이 열려있는 탭에서, 앱이 현재 로그인된 계정명과 선택된 프로필명을 가져옵니다. (계정 불일치 로그인 방지 + 담당자 태깅용)
+async function getAppAccountInfo_() {
   const tabs = await new Promise((resolve) =>
     chrome.tabs.query(
       {
@@ -72,13 +75,13 @@ async function getAppAccountUsername_() {
         });
       });
       console.debug('[InstaLog] 탭', tab.url, '응답:', response);
-      if (response?.username) return response.username;
+      if (response?.username) return { username: response.username, profileName: response.profileName || '' };
     } catch (err) {
       console.debug('[InstaLog] 탭', tab.url, '응답 실패(콘텐츠 스크립트 없음 등):', err?.message || err);
     }
   }
   console.debug('[InstaLog] 앱 계정을 찾지 못함');
-  return null;
+  return { username: null, profileName: '' };
 }
 
 async function loadMainView_() {
@@ -110,22 +113,28 @@ async function loadMainView_() {
     return;
   }
 
+  const activeProjects = projects.filter((p) => p.status === 'active' || p.status === 'waiting');
+
   projectSelect.innerHTML = '';
-  if (projects.length === 0) {
+  if (activeProjects.length === 0) {
     const opt = document.createElement('option');
-    opt.textContent = '프로젝트가 없습니다';
+    opt.textContent = projects.length === 0 ? '프로젝트가 없습니다' : '진행 중인 프로젝트가 없습니다';
     opt.value = '';
     projectSelect.appendChild(opt);
+    // 선택해둔 프로젝트가 더 이상 진행 중이 아니게 됐다면(종료/보관), 그 id를 계속
+    // 들고 있으면 content.js가 여전히 그 프로젝트에 DM을 기록해버린다 — 비워서 막는다.
+    await setStorage_({ instalogProjectId: '', instalogProjectName: '' });
   } else {
-    for (const p of projects) {
+    for (const p of activeProjects) {
       const opt = document.createElement('option');
       opt.value = p.id;
       opt.textContent = p.name;
       projectSelect.appendChild(opt);
     }
-    const selectedId = projects.some((p) => p.id === instalogProjectId) ? instalogProjectId : projects[0].id;
+    const mostRecentlyUpdated = activeProjects.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest));
+    const selectedId = activeProjects.some((p) => p.id === instalogProjectId) ? instalogProjectId : mostRecentlyUpdated.id;
     projectSelect.value = selectedId;
-    const selectedProject = projects.find((p) => p.id === selectedId);
+    const selectedProject = activeProjects.find((p) => p.id === selectedId);
     await setStorage_({ instalogProjectId: selectedId, instalogProjectName: selectedProject.name });
   }
 
@@ -160,7 +169,8 @@ function updateRecordingUI_(isRecording) {
   recordingToggleBtn.classList.toggle('recording-off', !isRecording);
 }
 
-loginBtn.addEventListener('click', async () => {
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
   const username = loginUsername.value.trim();
   const password = loginPassword.value;
   if (!username || !password) {
@@ -179,13 +189,13 @@ loginBtn.addEventListener('click', async () => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || '로그인에 실패했습니다.');
 
-    const appAccount = await getAppAccountUsername_();
-    if (appAccount && appAccount.toLowerCase() !== body.username.toLowerCase()) {
+    const appInfo = await getAppAccountInfo_();
+    if (appInfo.username && appInfo.username.toLowerCase() !== body.username.toLowerCase()) {
       loginError.textContent = 'InstaLog 앱과 로그인 계정이 일치하지 않습니다.';
       return;
     }
 
-    await setStorage_({ instalogToken: body.token, instalogUsername: body.username });
+    await setStorage_({ instalogToken: body.token, instalogUsername: body.username, instalogProfileName: appInfo.profileName });
     loginPassword.value = '';
     await loadMainView_();
   } catch (err) {
@@ -206,7 +216,7 @@ logoutCancelBtn.addEventListener('click', () => {
 logoutConfirmBtn.addEventListener('click', async () => {
   const { instalogToken } = await getStorage_(['instalogToken']);
   if (instalogToken) await syncRecordingState_(instalogToken, false); // 로그아웃하면 더 이상 기록되지 않으므로 앱 배지도 정지 상태로 반영
-  await setStorage_({ instalogToken: '', instalogUsername: '', instalogProjectId: '', instalogProjectName: '' });
+  await setStorage_({ instalogToken: '', instalogUsername: '', instalogProjectId: '', instalogProjectName: '', instalogProfileName: '' });
   logoutConfirmModal.classList.remove('show');
   showView_('login');
 });
@@ -221,6 +231,49 @@ projectSelect.addEventListener('change', async () => {
   });
 });
 
+function setListUpStatus_(message, kind) {
+  listUpStatus.textContent = message;
+  listUpStatus.classList.toggle('is-error', kind === 'error');
+  listUpStatus.classList.toggle('is-success', kind === 'success');
+}
+
+// 리스트업은 기록 시작/일시정지 상태와 무관하게 항상 동작합니다.
+listUpBtn.addEventListener('click', async () => {
+  if (!projectSelect.value) {
+    setListUpStatus_('프로젝트를 먼저 선택해주세요.', 'error');
+    return;
+  }
+
+  listUpBtn.disabled = true;
+  setListUpStatus_('현재 프로필 정보를 확인하는 중...', null);
+
+  try {
+    const [tab] = await new Promise((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+    // profile_watcher.js(리스트업 수신 측)는 manifest.json에서 /direct/*를 exclude_matches로
+    // 뺀 페이지에만 주입되므로, 여기 URL 체크도 같은 예외를 둬야 DM 탭에서 눌렀을 때
+    // "리스트업에 실패했습니다" 같은 엉뚱한 메시지 대신 정확한 안내가 뜬다.
+    if (!tab || !/^https:\/\/www\.instagram\.com\//.test(tab.url || '') || /^https:\/\/www\.instagram\.com\/direct\//.test(tab.url || '')) {
+      setListUpStatus_('인스타그램 프로필 페이지를 열고 시도해주세요.', 'error');
+      return;
+    }
+
+    const response = await new Promise((resolve) => {
+      chrome.tabs.sendMessage(tab.id, { type: 'INSTALOG_LIST_UP' }, (res) => {
+        if (chrome.runtime.lastError) resolve({ ok: false, error: '인스타그램 프로필 페이지를 열고 시도해주세요.' });
+        else resolve(res);
+      });
+    });
+
+    if (response && response.ok) {
+      setListUpStatus_(`${response.nickname || response.username}님의 데이터가 추가되었습니다.`, 'success');
+    } else {
+      setListUpStatus_((response && response.error) || '리스트업에 실패했습니다.', 'error');
+    }
+  } finally {
+    listUpBtn.disabled = false;
+  }
+});
+
 recordingToggleBtn.addEventListener('click', async () => {
   const { instalogToken, instalogUsername, instalogRecording } = await getStorage_([
     'instalogToken',
@@ -231,11 +284,13 @@ recordingToggleBtn.addEventListener('click', async () => {
 
   if (next) {
     // 기록을 시작하려면 InstaLog 앱이 열려있고, 같은 계정으로 로그인되어 있어야 합니다.
-    const appAccount = await getAppAccountUsername_();
-    if (!appAccount || appAccount.toLowerCase() !== instalogUsername.toLowerCase()) {
+    // 이 타이밍에 앱이 선택된 프로필도 함께 가져와, 그 사이 프로필이 바뀌었어도 최신 값으로 맞춥니다.
+    const appInfo = await getAppAccountInfo_();
+    if (!appInfo.username || appInfo.username.toLowerCase() !== instalogUsername.toLowerCase()) {
       recordingError.textContent = `InstaLog 앱에서 ${instalogUsername} 계정으로 로그인해주세요.`;
       return;
     }
+    await setStorage_({ instalogProfileName: appInfo.profileName });
   }
 
   recordingError.textContent = '';

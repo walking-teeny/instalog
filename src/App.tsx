@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Instagram, Settings } from 'lucide-react';
+import { Instagram, X } from 'lucide-react';
 import { DashboardView } from './components/DashboardView';
 import { DmLogsView } from './components/DmLogsView';
 import { ProjectDetailView } from './components/ProjectDetailView';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManualLogModal } from './components/ManualLogModal';
 import { LoginView } from './components/LoginView';
+import { ProfileSelectView } from './components/ProfileSelectView';
+import { ProfileAvatar } from './components/ProfileAvatar';
 import { SettingsModal } from './components/SettingsModal';
-import { api, getToken, getUsername, clearToken, clearUsername } from './api';
+import {
+  api,
+  getToken,
+  getUsername,
+  clearToken,
+  clearUsername,
+  getProfileName,
+  getProfiles,
+  setProfileName,
+  clearProfileName,
+  deleteProfile,
+} from './api';
 import { Project, DmLog, DmStatus, WidgetSettings } from './types';
 import { parseRoute, pushRoute, Route } from './router';
 
@@ -20,6 +33,7 @@ const nowTimestamp = () => {
 
 export default function App() {
   const [isAuthed, setIsAuthed] = useState(!!getToken());
+  const [profileName, setProfileNameState] = useState(getProfileName());
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   const initialRoute = parseRoute();
@@ -44,9 +58,25 @@ export default function App() {
 
   // Force back to the login screen whenever the API rejects the stored token.
   useEffect(() => {
-    const handleUnauthorized = () => setIsAuthed(false);
+    const handleUnauthorized = () => {
+      setIsAuthed(false);
+      clearProfileName();
+      setProfileNameState(null);
+    };
     window.addEventListener('instalog:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('instalog:unauthorized', handleUnauthorized);
+  }, []);
+
+  // Profiles live in localStorage with no server-side source of truth, so if this account
+  // is open in another tab and someone switches profile there, this tab's state would
+  // otherwise silently drift out of sync (and a later add/delete here could clobber theirs).
+  // The 'storage' event only fires for changes made in OTHER tabs, which is exactly what we want.
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'instalog_profile_name') setProfileNameState(e.newValue);
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Keep the on-screen view in sync with the URL for browser back/forward navigation.
@@ -182,7 +212,8 @@ export default function App() {
     if (target) bumpProjectUpdatedAt(target.projectId);
   };
 
-  const handleAddManualLog = (newLog: DmLog) => {
+  const handleAddManualLog = (newLogInput: DmLog) => {
+    const newLog: DmLog = { ...newLogInput, profileName: profileName ?? '' };
     setLogs((prev) => [newLog, ...prev]);
     api.createLog(newLog).catch(console.error);
 
@@ -204,7 +235,7 @@ export default function App() {
       setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
       api.updateProject(updatedProject).catch(console.error);
     }
-    showToast(`@${newLog.influencer.handle}님 수기 로그가 성공적으로 저장되었습니다.`);
+    showToast(`@${newLog.influencer.handle}님의 데이터가 추가되었습니다.`);
   };
 
   const showToast = (message: string, variant: 'success' | 'danger' = 'success') => {
@@ -218,21 +249,55 @@ export default function App() {
   const handleLogout = () => {
     clearToken();
     clearUsername();
+    clearProfileName();
+    setProfileNameState(null);
     setIsSettingsModalOpen(false);
     setIsAuthed(false);
   };
 
   const handleOpenSettings = () => {
     setIsSettingsModalOpen(true);
-    if (widgetSettings && !widgetSettings.hasOpenedSettings) {
-      const updated = { ...widgetSettings, hasOpenedSettings: true };
-      setWidgetSettings(updated);
-      api.updateWidgetSettings(updated).catch(console.error);
-    }
+  };
+
+  // The tooltip nudging the user toward settings only goes away once they explicitly
+  // dismiss it (the X button) — opening settings itself no longer counts as "seen it".
+  // Dismissal is per profile (so a teammate's profile on the same login still sees it) and
+  // server-persisted (so it survives across devices/browsers, not just this one's localStorage).
+  const handleDismissTooltip = () => {
+    if (!profileName || !widgetSettings || widgetSettings.dismissedTooltipProfiles.includes(profileName)) return;
+    const updated = { ...widgetSettings, dismissedTooltipProfiles: [...widgetSettings.dismissedTooltipProfiles, profileName] };
+    setWidgetSettings(updated);
+    api.updateWidgetSettings(updated).catch(console.error);
   };
 
   if (!isAuthed) {
     return <LoginView onLoginSuccess={() => setIsAuthed(true)} />;
+  }
+
+  const handleSetProfile = (name: string) => {
+    setProfileName(name);
+    setProfileNameState(name);
+  };
+
+  // Switching profile from the settings modal always lands back on the dashboard,
+  // rather than leaving the user on whatever page they had open (e.g. the logs list).
+  const handleSwitchProfile = (name: string) => {
+    handleSetProfile(name);
+    navigateToDashboard();
+  };
+
+  const handleDeleteProfile = (name: string) => {
+    deleteProfile(name);
+    if (name === profileName) {
+      // Deleted the profile currently in use — send back to the profile picker, same as
+      // logging out only clears the account, this only clears which profile is active.
+      clearProfileName();
+      setProfileNameState(null);
+    }
+  };
+
+  if (!profileName) {
+    return <ProfileSelectView onSelect={handleSetProfile} />;
   }
 
   if (isLoadingData || !widgetSettings) {
@@ -244,6 +309,7 @@ export default function App() {
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const currentProfile = getProfiles().find((p) => p.name === profileName);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f8fafc] text-[#111827]">
@@ -255,12 +321,12 @@ export default function App() {
           </div>
           <span className="text-sm font-black text-[#111827] tracking-tight">InstaLog</span>
           {widgetSettings.isRecording ? (
-            <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 font-bold tracking-tight">
+            <span className="flex items-center gap-1 text-[10.8px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 font-bold tracking-tight">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               기록 중
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-bold tracking-tight">
+            <span className="flex items-center gap-1 text-[10.8px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-bold tracking-tight">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
               기록 정지
             </span>
@@ -269,15 +335,31 @@ export default function App() {
         <div className="relative">
           <button
             onClick={handleOpenSettings}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 pl-2 pr-3 py-1 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
           >
-            <Settings className="w-4 h-4" />
+            {currentProfile ? (
+              <ProfileAvatar profile={currentProfile} className="w-6 h-6 text-[10.8px]" />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-slate-200 shrink-0" />
+            )}
+            <span className="text-[13.2px] font-bold text-slate-700">{profileName}</span>
           </button>
-          {!isSettingsModalOpen && !widgetSettings.hasOpenedSettings && (
-            <div className="absolute top-full right-0 mt-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-medium shadow-lg z-10">
-              <div className="absolute -top-1 right-3.5 w-2 h-2 bg-slate-800 rotate-45" />
-              인스타그램과 연동하세요
-            </div>
+          {!isSettingsModalOpen && !!profileName && !widgetSettings.dismissedTooltipProfiles.includes(profileName) && (
+            <>
+              {/* Anchored to the avatar's fixed distance from the pill's LEFT edge (pl-2 + half of w-6),
+                  not the tooltip's own right edge — the tooltip's right edge shifts with profileName's
+                  length, so a right-offset tail would drift off the avatar for any other profile name. */}
+              <div className="absolute left-4 top-full mt-0.5 w-2 h-2 bg-slate-800 rotate-45 z-10" />
+              <div className="absolute top-full right-0 mt-1.5 whitespace-nowrap flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg bg-slate-800 text-white text-[13.2px] font-medium shadow-lg z-10">
+                인스타그램과 연동하세요
+                <button
+                  onClick={handleDismissTooltip}
+                  className="p-0.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </>
           )}
         </div>
       </header>
@@ -354,8 +436,11 @@ export default function App() {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         username={getUsername()}
+        profileName={profileName}
         onClose={() => setIsSettingsModalOpen(false)}
         onLogout={handleLogout}
+        onSwitchProfile={handleSwitchProfile}
+        onDeleteProfile={handleDeleteProfile}
       />
     </div>
   );

@@ -44,6 +44,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Derive stats directly from `logs` to strictly unify with "DM 자동 수집 로그"
   const logStats = useMemo(() => {
     const total = logs.length;
+    const listUp = logs.filter((l) => l.status === 'list_up').length;
     const waiting = logs.filter((l) => l.status === 'waiting').length;
     const inTalks = logs.filter((l) => l.status === 'in_talks').length;
     const confirmed = logs.filter((l) => l.status === 'confirmed').length;
@@ -55,6 +56,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     return {
       total,
+      listUp,
       waiting,
       inTalks,
       confirmed,
@@ -71,10 +73,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return projects.map((p) => {
       const pLogs = logs.filter((l) => l.projectId === p.id);
       const totalSent = pLogs.length;
+      const listUpCount = pLogs.filter((l) => l.status === 'list_up').length;
       const waitingCount = pLogs.filter((l) => l.status === 'waiting').length;
       const inTalksCount = pLogs.filter((l) => l.status === 'in_talks').length;
-      const repliedCount = pLogs.filter((l) => l.status !== 'waiting' && l.status !== '').length;
+      const repliedCount = pLogs.filter((l) => l.status !== 'waiting' && l.status !== '' && l.status !== 'list_up').length;
       const confirmedCount = pLogs.filter((l) => l.status === 'confirmed').length;
+      const rejectedCount = pLogs.filter((l) => l.status === 'rejected').length;
       const latest = pLogs[0];
       const latestLog = latest
         ? {
@@ -86,6 +90,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 ? '소통 중'
                 : latest.status === 'rejected'
                 ? '거절'
+                : latest.status === 'list_up'
+                ? '리스트업'
                 : '제안 발송',
             timeAgo: latest.timeAgo,
           }
@@ -94,10 +100,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return {
         ...p,
         totalSent,
+        listUpCount,
         waitingCount,
         inTalksCount,
         repliedCount,
         confirmedCount,
+        rejectedCount,
         latestLog,
       };
     });
@@ -189,80 +197,118 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
       </div>
 
-      {/* 4 Metric KPI Cards - 1 Row Compact Design, strictly unified with DM 자동 수집 로그 */}
-      <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
+      {/* 6 Metric KPI Cards, strictly unified with DM 자동 수집 로그 */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 sm:gap-3">
         {/* Card 1: 전체 수집 로그 */}
-        <div 
+        <div
           onClick={() => onNavigateToLogs?.('all')}
           title="클릭 시 DM 자동 수집 로그 전체 보기"
           className="py-3 px-3 sm:px-4 rounded-xl bg-white border border-[#e2e8f0] shadow-xs cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all group"
         >
           <div className="min-w-0">
             <div className="flex items-center gap-1 mb-0.5">
-              <p className="text-[11px] sm:text-xs font-semibold text-[#64748b] group-hover:text-blue-600 truncate">
-                전체 수집 로그
+              <p className="text-[13.2px] sm:text-xs font-semibold text-[#64748b] group-hover:text-blue-600 truncate">
+                전체
               </p>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-xl sm:text-2xl font-black text-[#111827] font-mono">{logStats.total}</span>
-              <span className="text-[11px] font-bold text-slate-500">건</span>
+              <span className="text-[13.2px] font-bold text-slate-500">건</span>
             </div>
           </div>
         </div>
 
-        {/* Card 2: 회신 대기 */}
-        <div 
+        {/* Card 2: 리스트업 */}
+        <div
+          onClick={() => onNavigateToLogs?.('list_up')}
+          title="클릭 시 리스트업 DM 로그 보기"
+          className="py-3 px-3 sm:px-4 rounded-xl bg-white border border-[#e2e8f0] shadow-xs cursor-pointer hover:border-purple-400 hover:shadow-sm transition-all group"
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-1 mb-0.5">
+              <p className="text-[13.2px] sm:text-xs font-semibold text-[#64748b] group-hover:text-purple-700 truncate">
+                리스트업
+              </p>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl sm:text-2xl font-black text-purple-600 font-mono">{logStats.listUp}</span>
+              <span className="text-[13.2px] font-bold text-slate-500">건</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: 회신 대기 */}
+        <div
           onClick={() => onNavigateToLogs?.('waiting')}
           title="클릭 시 회신 대기 DM 로그 보기"
           className="py-3 px-3 sm:px-4 rounded-xl bg-white border border-[#e2e8f0] shadow-xs cursor-pointer hover:border-slate-400 hover:shadow-sm transition-all group"
         >
           <div className="min-w-0">
             <div className="flex items-center gap-1 mb-0.5">
-              <p className="text-[11px] sm:text-xs font-semibold text-[#64748b] group-hover:text-slate-800 truncate">
+              <p className="text-[13.2px] sm:text-xs font-semibold text-[#64748b] group-hover:text-slate-800 truncate">
                 회신 대기
               </p>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-xl sm:text-2xl font-black text-blue-600 font-mono">{logStats.waiting}</span>
-              <span className="text-[11px] font-bold text-slate-500">건</span>
+              <span className="text-[13.2px] font-bold text-slate-500">건</span>
             </div>
           </div>
         </div>
 
-        {/* Card 3: 소통 중 */}
-        <div 
+        {/* Card 4: 소통 중 */}
+        <div
           onClick={() => onNavigateToLogs?.('in_talks')}
           title="클릭 시 소통 중인 DM 로그 보기"
           className="py-3 px-3 sm:px-4 rounded-xl bg-white border border-[#e2e8f0] shadow-xs cursor-pointer hover:border-amber-400 hover:shadow-sm transition-all group"
         >
           <div className="min-w-0">
             <div className="flex items-center gap-1 mb-0.5">
-              <p className="text-[11px] sm:text-xs font-semibold text-[#64748b] group-hover:text-amber-700 truncate">
+              <p className="text-[13.2px] sm:text-xs font-semibold text-[#64748b] group-hover:text-amber-700 truncate">
                 소통 중
               </p>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-xl sm:text-2xl font-black text-amber-600 font-mono">{logStats.inTalks}</span>
-              <span className="text-[11px] font-bold text-slate-500">건</span>
+              <span className="text-[13.2px] font-bold text-slate-500">건</span>
             </div>
           </div>
         </div>
 
-        {/* Card 4: 협업 성사 */}
-        <div 
+        {/* Card 5: 협업 성사 */}
+        <div
           onClick={() => onNavigateToLogs?.('confirmed')}
           title="클릭 시 협업 성사된 DM 로그 보기"
           className="py-3 px-3 sm:px-4 rounded-xl bg-white border border-[#e2e8f0] shadow-xs cursor-pointer hover:border-emerald-400 hover:shadow-sm transition-all group"
         >
           <div className="min-w-0">
             <div className="flex items-center gap-1 mb-0.5">
-              <p className="text-[11px] sm:text-xs font-semibold text-[#64748b] group-hover:text-[#006e1d] truncate">
+              <p className="text-[13.2px] sm:text-xs font-semibold text-[#64748b] group-hover:text-[#006e1d] truncate">
                 협업 성사
               </p>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-xl sm:text-2xl font-black text-[#00c73c] font-mono">{logStats.confirmed}</span>
-              <span className="text-[11px] font-bold text-slate-500">건</span>
+              <span className="text-[13.2px] font-bold text-slate-500">건</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 6: 거절 */}
+        <div
+          onClick={() => onNavigateToLogs?.('rejected')}
+          title="클릭 시 거절된 DM 로그 보기"
+          className="py-3 px-3 sm:px-4 rounded-xl bg-white border border-[#e2e8f0] shadow-xs cursor-pointer hover:border-rose-400 hover:shadow-sm transition-all group"
+        >
+          <div className="min-w-0">
+            <div className="flex items-center gap-1 mb-0.5">
+              <p className="text-[13.2px] sm:text-xs font-semibold text-[#64748b] group-hover:text-rose-700 truncate">
+                거절
+              </p>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono">{logStats.rejected}</span>
+              <span className="text-[13.2px] font-bold text-slate-500">건</span>
             </div>
           </div>
         </div>
@@ -391,16 +437,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {/* Left info */}
                   <div className="flex items-start gap-4 min-w-[320px]">
                     <div>
-                    <p className="text-[11px] text-slate-400 font-medium mb-0.5">{project.projectType}</p>
+                    <p className="text-[13.2px] text-slate-400 font-medium mb-0.5">{project.projectType}</p>
                     <div className="flex items-center gap-2">
                       <h3
                         onClick={() => onSelectProject(project.id)}
-                        className="text-[18px] font-extrabold text-[#111827] hover:text-emerald-600 cursor-pointer transition-colors"
+                        className="text-[21.6px] font-extrabold text-[#111827] hover:text-emerald-600 cursor-pointer transition-colors"
                       >
                         {project.name}
                       </h3>
                       <span
-                        className={`text-[8px] leading-none font-bold px-1.5 py-[3px] rounded-full whitespace-nowrap ${
+                        className={`text-[9.6px] leading-none font-bold px-1.5 py-[3px] rounded-full whitespace-nowrap ${
                           project.status === 'active' || project.status === 'waiting'
                             ? 'bg-emerald-50 text-[#006e1d] border border-emerald-200'
                             : 'bg-slate-100 text-slate-600 border border-slate-200'
@@ -412,43 +458,63 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Right: 4 Stats (전체 수집 로그 | 회신 대기 | 소통 중 | 협업 성사) - Unified with Top KPI */}
-                  <div className="flex items-center gap-5 sm:gap-6 shrink-0">
+                  {/* Right: 6 Stats (전체 수집 로그 | 리스트업 | 회신 대기 | 소통 중 | 협업 성사 | 거절) - Unified with Top KPI */}
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:flex-nowrap sm:gap-x-6 shrink-0">
                     <div className="text-left">
-                      <p className="text-[11px] text-slate-400 font-medium">전체 수집 로그</p>
+                      <p className="text-[13.2px] text-slate-400 font-medium">전체</p>
                       <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-[11px] font-black text-slate-500 font-mono">{project.totalSent}</span>
-                        <span className="text-[11px] font-normal text-slate-500">건</span>
+                        <span className="text-[13.2px] font-black text-slate-500 font-mono">{project.totalSent}</span>
+                        <span className="text-[13.2px] font-normal text-slate-500">건</span>
                       </div>
                     </div>
 
                     <div className="w-[1px] h-6 bg-slate-200" />
 
                     <div className="text-left">
-                      <p className="text-[11px] text-slate-400 font-medium">회신 대기</p>
+                      <p className="text-[13.2px] text-slate-400 font-medium">리스트업</p>
                       <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-[11px] font-black text-slate-500 font-mono">{project.waitingCount}</span>
-                        <span className="text-[11px] font-normal text-slate-500">건</span>
+                        <span className="text-[13.2px] font-black text-slate-500 font-mono">{project.listUpCount}</span>
+                        <span className="text-[13.2px] font-normal text-slate-500">건</span>
                       </div>
                     </div>
 
                     <div className="w-[1px] h-6 bg-slate-200" />
 
                     <div className="text-left">
-                      <p className="text-[11px] text-slate-400 font-medium">소통 중</p>
+                      <p className="text-[13.2px] text-slate-400 font-medium">회신 대기</p>
                       <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-[11px] font-black text-slate-500 font-mono">{project.inTalksCount}</span>
-                        <span className="text-[11px] font-normal text-slate-500">건</span>
+                        <span className="text-[13.2px] font-black text-slate-500 font-mono">{project.waitingCount}</span>
+                        <span className="text-[13.2px] font-normal text-slate-500">건</span>
                       </div>
                     </div>
 
                     <div className="w-[1px] h-6 bg-slate-200" />
 
                     <div className="text-left">
-                      <p className="text-[11px] text-slate-400 font-medium">협업 성사</p>
+                      <p className="text-[13.2px] text-slate-400 font-medium">소통 중</p>
                       <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-[11px] font-black text-slate-500 font-mono">{project.confirmedCount}</span>
-                        <span className="text-[11px] font-normal text-slate-500">건</span>
+                        <span className="text-[13.2px] font-black text-slate-500 font-mono">{project.inTalksCount}</span>
+                        <span className="text-[13.2px] font-normal text-slate-500">건</span>
+                      </div>
+                    </div>
+
+                    <div className="w-[1px] h-6 bg-slate-200" />
+
+                    <div className="text-left">
+                      <p className="text-[13.2px] text-slate-400 font-medium">협업 성사</p>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="text-[13.2px] font-black text-slate-500 font-mono">{project.confirmedCount}</span>
+                        <span className="text-[13.2px] font-normal text-slate-500">건</span>
+                      </div>
+                    </div>
+
+                    <div className="w-[1px] h-6 bg-slate-200" />
+
+                    <div className="text-left">
+                      <p className="text-[13.2px] text-slate-400 font-medium">거절</p>
+                      <div className="flex items-baseline gap-1 mt-0.5">
+                        <span className="text-[13.2px] font-black text-slate-500 font-mono">{project.rejectedCount}</span>
+                        <span className="text-[13.2px] font-normal text-slate-500">건</span>
                       </div>
                     </div>
                   </div>

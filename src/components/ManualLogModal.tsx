@@ -179,18 +179,18 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
             />
 
             {fetchStatus === 'loading' && (
-              <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+              <p className="flex items-center gap-1.5 text-[13.2px] text-slate-500">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 계정 정보를 불러오는 중...
               </p>
             )}
             {fetchStatus === 'error' && (
-              <p className="text-[11px] text-rose-500">
+              <p className="text-[13.2px] text-rose-500">
                 인스타그램 프로필 URL 형식이 아닙니다. (예: https://instagram.com/계정아이디)
               </p>
             )}
             {fetchStatus === 'done' && accountInfo && (
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+              <div className="flex items-center gap-1.5 text-[13.2px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
                 <CheckCircle2 className="w-3 h-3 shrink-0" />
                 <span className="font-mono font-bold">@{accountInfo.handle}</span>
                 <span>· {accountInfo.nickname}</span>
@@ -198,11 +198,12 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
               </div>
             )}
             {fetchStatus === 'unavailable' && accountInfo && (
-              <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+              <div className="flex items-start gap-1.5 text-[13.2px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
                 <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
                 <span>
-                  자동으로 계정 정보를 가져오지 못했습니다. (비공개 계정이거나 인스타그램이 요청을 제한했을 수 있습니다)
-                  닉네임/팔로워 수는 공란으로 저장되며, 크롬 확장 프로그램으로 프로필을 방문하면 자동으로 채워집니다.
+                  일부 계정 정보를 불러오는 데 실패하였습니다.
+                  <br />
+                  확장 프로그램 위젯에서 [빈 데이터 채우기] 버튼을 클릭하면 누락된 정보를 불러옵니다.
                 </span>
               </div>
             )}

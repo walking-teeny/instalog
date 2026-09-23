@@ -19,9 +19,12 @@ import {
   ArrowUpDown
 } from 'lucide-react';
 import { DmLog, Project, DmStatus, ContactChannel } from '../types';
+import { DM_STATUS_LABELS, CONTACT_CHANNEL_LABELS } from '../constants';
+import { StatusFilterBar, computeStatusCounts } from './StatusFilterBar';
+import { StatusSelect } from './StatusSelect';
 
 const COL_WIDTHS_STORAGE_KEY = 'instalog_dm_log_col_widths';
-const DEFAULT_COL_WIDTHS = [138, 200, 180, 120, 120, 82, 240, 40];
+const DEFAULT_COL_WIDTHS = [138, 200, 180, 120, 120, 82, 240, 90, 40];
 
 const loadColWidths = (): number[] => {
   try {
@@ -124,15 +127,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
   };
 
   // Status counts
-  const statusCounts = useMemo(() => {
-    return {
-      all: logs.length,
-      waiting: logs.filter((l) => l.status === 'waiting' || l.status === '').length,
-      in_talks: logs.filter((l) => l.status === 'in_talks').length,
-      rejected: logs.filter((l) => l.status === 'rejected').length,
-      confirmed: logs.filter((l) => l.status === 'confirmed').length,
-    };
-  }, [logs]);
+  const statusCounts = useMemo(() => computeStatusCounts(logs), [logs]);
 
   // Filtered Logs
   const filteredLogs = useMemo(() => {
@@ -200,43 +195,32 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
     const targetLogs = scope === 'page' ? paginatedLogs : logs;
     const headers = [
       '로그ID',
-      '발송일시',
-      '인플루언서 계정',
-      '프로필 링크',
-      '팔로워 수',
+      '최근 업데이트 일시',
       '연동 캠페인',
-      '진행 상태',
-      '기타 연락 수단',
+      '팔로워수',
+      '계정 ID',
+      '계정 닉네임',
+      '계정 링크',
+      '소통 상태',
+      '기타 소통 수단',
       '2차 발송 여부',
       '메모',
+      '담당자',
     ];
-
-    const statusMap: Record<DmStatus, string> = {
-      waiting: '회신 대기',
-      in_talks: '소통 중',
-      confirmed: '협업 성사',
-      rejected: '거절',
-      '': '회신 대기',
-    };
-
-    const channelMap: Record<ContactChannel, string> = {
-      none: '없음',
-      email: '메일',
-      inpock: '인포크',
-      email_inpock: '메일+인포크',
-    };
 
     const rows = targetLogs.map((log) => [
       log.id,
       log.timestamp,
-      `@${log.influencer.handle}`,
-      log.influencer.profileUrl,
-      log.influencer.followers,
       log.projectName,
-      statusMap[log.status],
-      channelMap[log.channel],
+      log.influencer.followers,
+      `@${log.influencer.handle}`,
+      log.influencer.nickname || '',
+      log.influencer.profileUrl,
+      DM_STATUS_LABELS[log.status],
+      CONTACT_CHANNEL_LABELS[log.channel],
       log.secondMessageSent ? '발송 완료' : '미발송',
       log.memo || '',
+      log.profileName || '',
     ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -305,81 +289,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
       {/* Filter Bar (Matches Image 5) */}
       <div className="space-y-3">
         {/* Status Filter Pills (Interactive Pill Row from Image 5) */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'all'
-                ? 'bg-[#00c73c] text-white shadow-sm border-[#00c73c]'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span>전체 로그</span>
-            <span className={`text-[11px] px-1.5 py-0.2 rounded-full ${statusFilter === 'all' ? 'bg-black/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
-              {statusCounts.all}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('waiting')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'waiting'
-                ? 'bg-blue-600 text-white shadow-sm border-blue-600'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-            <span>회신 대기</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.waiting}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('in_talks')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'in_talks'
-                ? 'bg-amber-500 text-white shadow-sm border-amber-500'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            <span>소통 중</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.in_talks}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('rejected')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'rejected'
-                ? 'bg-rose-500 text-white shadow-sm border-rose-500'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-            <span>거절</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.rejected}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setStatusFilter('confirmed')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-              statusFilter === 'confirmed'
-                ? 'bg-emerald-600 text-white shadow-sm border-emerald-600'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span>협업 성사</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-              {statusCounts.confirmed}
-            </span>
-          </button>
-        </div>
+        <StatusFilterBar value={statusFilter} onChange={setStatusFilter} counts={statusCounts} />
       </div>
 
       {/* Filter Controls */}
@@ -499,6 +409,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                   '기타 소통 수단',
                   '2차 발송',
                   '메모',
+                  '담당자',
                   '',
                 ].map((label, i) => (
                   <th key={i} className="py-3 px-4 relative overflow-hidden text-ellipsis whitespace-nowrap">
@@ -525,8 +436,8 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
             <tbody className="divide-y divide-[#f1f5f9]">
               {paginatedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    일치하는 DM 수집 로그가 없습니다.
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                    데이터가 없습니다.
                   </td>
                 </tr>
               ) : (
@@ -552,8 +463,8 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                             @{log.influencer.handle}
                           </a>
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">{log.influencer.nickname || log.influencer.handle}</p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-1 truncate">
+                        <p className="text-[13.2px] text-slate-500 font-medium mt-1 truncate">{log.influencer.nickname || log.influencer.handle}</p>
+                        <p className="text-[12px] text-slate-400 font-mono mt-1 truncate">
                           팔로워 {log.influencer.followers}
                         </p>
                       </td>
@@ -586,32 +497,10 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
 
                       {/* 상태 (Interactive Selector) */}
                       <td className="py-3.5 px-4">
-                        <div className="relative">
-                          <select
-                            value={log.status || 'waiting'}
-                            onChange={(e) => {
-                              onUpdateLog({
-                                ...log,
-                                status: e.target.value as DmStatus,
-                              });
-                            }}
-                            className={`w-full appearance-none text-xs font-bold pl-0 pr-4 py-1 rounded-lg cursor-pointer focus:outline-none ${
-                              log.status === 'confirmed'
-                                ? 'text-emerald-700'
-                                : log.status === 'in_talks'
-                                ? 'text-amber-800'
-                                : log.status === 'rejected'
-                                ? 'text-rose-700'
-                                : 'text-blue-700'
-                            }`}
-                          >
-                            <option value="waiting">회신 대기</option>
-                            <option value="in_talks">소통 중</option>
-                            <option value="confirmed">협업 성사</option>
-                            <option value="rejected">거절</option>
-                          </select>
-                          <ChevronDown className="w-3 h-3 text-slate-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        </div>
+                        <StatusSelect
+                          status={log.status}
+                          onChange={(status) => onUpdateLog({ ...log, status })}
+                        />
                       </td>
 
                       {/* 기타 수단 */}
@@ -669,7 +558,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                             />
                             <button
                               onClick={() => handleSaveMemo(log)}
-                              className="px-2 py-1 bg-emerald-500 text-white rounded text-[11px] font-bold"
+                              className="px-2 py-1 bg-emerald-500 text-white rounded text-[13.2px] font-bold"
                             >
                               저장
                             </button>
@@ -688,6 +577,17 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                             </span>
                             <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 ml-1" />
                           </div>
+                        )}
+                      </td>
+
+                      {/* 담당자 */}
+                      <td className="py-3.5 px-4">
+                        {log.profileName ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold text-[11px] truncate max-w-full">
+                            {log.profileName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
                         )}
                       </td>
 
@@ -832,7 +732,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                 }`}
               >
                 <p className="text-xs font-bold text-[#111827]">현재 페이지에 표시되는 데이터만</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">선택한 페이지 및 적용된 필터의 결과만 다운로드합니다.</p>
+                <p className="text-[13.2px] text-slate-400 mt-0.5">선택한 페이지 및 적용된 필터의 결과만 다운로드합니다.</p>
               </button>
               <button
                 onClick={() => setExportScope('all')}
@@ -843,7 +743,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                 }`}
               >
                 <p className="text-xs font-bold text-[#111827]">모든 데이터</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">모든 데이터를 다운로드합니다.</p>
+                <p className="text-[13.2px] text-slate-400 mt-0.5">모든 데이터를 다운로드합니다.</p>
               </button>
             </div>
             <div className="flex items-center justify-end gap-2.5 pt-2">

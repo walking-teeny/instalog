@@ -98,8 +98,8 @@ apiRouter.post(
   ah(async (req, res) => {
     const p = req.body;
     await db.query(
-      `INSERT INTO projects (id, "userId", name, "projectType", brand, tag, status, "statusText", "iconType", "totalSent", "repliedCount", "confirmedCount", "latestLog", "createdAt", "updatedAt", description)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      `INSERT INTO projects (id, "userId", name, "projectType", brand, tag, status, "statusText", "iconType", "totalSent", "repliedCount", "confirmedCount", "latestLog", "createdAt", "updatedAt", description, "osPipeline")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
       [
         p.id,
         req.userId,
@@ -117,6 +117,7 @@ apiRouter.post(
         p.createdAt,
         p.updatedAt,
         p.description ?? null,
+        p.osPipeline ?? null,
       ]
     );
     res.status(201).json(p);
@@ -130,8 +131,8 @@ apiRouter.put(
     await db.query(
       `UPDATE projects SET name=$1, "projectType"=$2, brand=$3, tag=$4, status=$5,
          "statusText"=$6, "iconType"=$7, "totalSent"=$8, "repliedCount"=$9,
-         "confirmedCount"=$10, "latestLog"=$11, "createdAt"=$12, "updatedAt"=$13, description=$14
-       WHERE id=$15 AND "userId"=$16`,
+         "confirmedCount"=$10, "latestLog"=$11, "createdAt"=$12, "updatedAt"=$13, description=$14, "osPipeline"=$15
+       WHERE id=$16 AND "userId"=$17`,
       [
         p.name,
         p.projectType,
@@ -147,6 +148,7 @@ apiRouter.put(
         p.createdAt,
         p.updatedAt,
         p.description ?? null,
+        p.osPipeline ?? null,
         req.params.id,
         req.userId,
       ]
@@ -188,8 +190,8 @@ apiRouter.post(
   ah(async (req, res) => {
     const l = req.body;
     await db.query(
-      `INSERT INTO dm_logs (id, "userId", "projectId", "projectName", timestamp, "timeAgo", influencer, status, channel, "secondMessageSent", memo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      `INSERT INTO dm_logs (id, "userId", "projectId", "projectName", timestamp, "timeAgo", influencer, status, channel, "secondMessageSent", memo, "profileName")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [
         l.id,
         req.userId,
@@ -202,6 +204,7 @@ apiRouter.post(
         l.channel,
         !!l.secondMessageSent,
         l.memo,
+        l.profileName ?? '',
       ]
     );
     res.status(201).json(l);
@@ -214,8 +217,8 @@ apiRouter.put(
     const l = req.body;
     await db.query(
       `UPDATE dm_logs SET "projectId"=$1, "projectName"=$2, timestamp=$3, "timeAgo"=$4,
-         influencer=$5, status=$6, channel=$7, "secondMessageSent"=$8, memo=$9
-       WHERE id=$10 AND "userId"=$11`,
+         influencer=$5, status=$6, channel=$7, "secondMessageSent"=$8, memo=$9, "profileName"=$10
+       WHERE id=$11 AND "userId"=$12`,
       [
         l.projectId,
         l.projectName,
@@ -226,6 +229,7 @@ apiRouter.put(
         l.channel,
         !!l.secondMessageSent,
         l.memo,
+        l.profileName ?? '',
         req.params.id,
         req.userId,
       ]
@@ -263,10 +267,11 @@ apiRouter.get(
         todayLogsCount: 0,
         lastPing: '',
         hasOpenedSettings: false,
+        dismissedTooltipProfiles: '[]',
       };
       await db.query(
-        `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing", "hasOpenedSettings")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing", "hasOpenedSettings", "dismissedTooltipProfiles")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [
           row.userId,
           row.isRecording,
@@ -277,11 +282,12 @@ apiRouter.get(
           row.todayLogsCount,
           row.lastPing,
           row.hasOpenedSettings,
+          row.dismissedTooltipProfiles,
         ]
       );
     }
 
-    res.json(row);
+    res.json({ ...row, dismissedTooltipProfiles: JSON.parse(row.dismissedTooltipProfiles || '[]') });
   })
 );
 
@@ -290,10 +296,10 @@ apiRouter.put(
   ah(async (req, res) => {
     const s = req.body;
     await db.query(
-      `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing", "hasOpenedSettings")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO widget_settings ("userId", "isRecording", "selectedProjectId", "pairingAccount", "latencyMs", port, "todayLogsCount", "lastPing", "hasOpenedSettings", "dismissedTooltipProfiles")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT ("userId") DO UPDATE SET
-         "isRecording"=$2, "selectedProjectId"=$3, "pairingAccount"=$4, "latencyMs"=$5, port=$6, "todayLogsCount"=$7, "lastPing"=$8, "hasOpenedSettings"=$9`,
+         "isRecording"=$2, "selectedProjectId"=$3, "pairingAccount"=$4, "latencyMs"=$5, port=$6, "todayLogsCount"=$7, "lastPing"=$8, "hasOpenedSettings"=$9, "dismissedTooltipProfiles"=$10`,
       [
         req.userId,
         !!s.isRecording,
@@ -304,6 +310,7 @@ apiRouter.put(
         s.todayLogsCount,
         s.lastPing,
         !!s.hasOpenedSettings,
+        JSON.stringify(s.dismissedTooltipProfiles ?? []),
       ]
     );
     res.json(s);
