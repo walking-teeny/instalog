@@ -248,6 +248,14 @@ listUpBtn.addEventListener('click', async () => {
   setListUpStatus_('현재 프로필 정보를 확인하는 중...', null);
 
   try {
+    // app_bridge.js가 앱 탭 로드 시점에 캐시해둔 값에만 의존하면, 그 사이 프로필이 바뀌었거나
+    // 캐시가 비어있는 경우(예: 확장 프로그램 재설치 직후) 담당자가 빈 값으로 기록된다.
+    // 리스트업 직전에 한 번 더 앱 탭에서 최신 프로필을 가져와 캐시를 맞춰둔다.
+    const appInfo = await getAppAccountInfo_();
+    if (appInfo.username) {
+      await setStorage_({ instalogProfileName: appInfo.profileName });
+    }
+
     const [tab] = await new Promise((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
     // profile_watcher.js(리스트업 수신 측)는 manifest.json에서 /direct/*를 exclude_matches로
     // 뺀 페이지에만 주입되므로, 여기 URL 체크도 같은 예외를 둬야 DM 탭에서 눌렀을 때
