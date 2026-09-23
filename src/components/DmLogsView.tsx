@@ -23,8 +23,11 @@ import { DM_STATUS_LABELS, CONTACT_CHANNEL_LABELS } from '../constants';
 import { StatusFilterBar, computeStatusCounts } from './StatusFilterBar';
 import { StatusSelect } from './StatusSelect';
 
-const COL_WIDTHS_STORAGE_KEY = 'instalog_dm_log_col_widths';
-const DEFAULT_COL_WIDTHS = [138, 200, 180, 120, 120, 82, 240, 90, 40];
+// v2: bumped when 담당자/메모 swapped column order — old saved widths (keyed only by
+// array length, not by which column is which) would otherwise silently reattach to the
+// wrong column and show up as a very-wrong width for whichever column changed slots.
+const COL_WIDTHS_STORAGE_KEY = 'instalog_dm_log_col_widths_v2';
+const DEFAULT_COL_WIDTHS = [138, 200, 180, 120, 120, 82, 90, 240, 40];
 
 const loadColWidths = (): number[] => {
   try {
@@ -76,6 +79,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
     }
   }, [initialStatusFilter]);
   const [campaignFilter, setCampaignFilter] = useState<string>(selectedProjectId || 'all');
+  const [profileFilter, setProfileFilter] = useState<string>('all');
   const [channelFilter, setChannelFilter] = useState<'all' | ContactChannel>('all');
   const [secondMessageFilter, setSecondMessageFilter] = useState<'all' | 'sent' | 'not_sent'>('all');
   const [dateFrom, setDateFrom] = useState<string>('');
@@ -129,12 +133,22 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
   // Status counts
   const statusCounts = useMemo(() => computeStatusCounts(logs), [logs]);
 
+  // 로그에 실제로 찍혀있는 담당자만 후보로 — 삭제된 프로필도 예전 로그에 남아있으면 계속 필터할 수 있다.
+  const profileOptions = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.profileName).filter((p): p is string => !!p))).sort(),
+    [logs]
+  );
+
   // Filtered Logs
   const filteredLogs = useMemo(() => {
     let result = [...logs];
 
     if (campaignFilter !== 'all') {
       result = result.filter((l) => l.projectId === campaignFilter);
+    }
+
+    if (profileFilter !== 'all') {
+      result = result.filter((l) => l.profileName === profileFilter);
     }
 
     if (statusFilter !== 'all') {
@@ -171,7 +185,7 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
     }
 
     return result;
-  }, [logs, campaignFilter, statusFilter, searchTerm, channelFilter, secondMessageFilter, dateFrom, dateTo]);
+  }, [logs, campaignFilter, profileFilter, statusFilter, searchTerm, channelFilter, secondMessageFilter, dateFrom, dateTo]);
 
   const sortedLogs = useMemo(() => {
     const result = [...filteredLogs];
@@ -204,8 +218,8 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
       '소통 상태',
       '기타 소통 수단',
       '2차 발송 여부',
-      '메모',
       '담당자',
+      '메모',
     ];
 
     const rows = targetLogs.map((log) => [
@@ -219,8 +233,8 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
       DM_STATUS_LABELS[log.status],
       CONTACT_CHANNEL_LABELS[log.channel],
       log.secondMessageSent ? '발송 완료' : '미발송',
-      log.memo || '',
       log.profileName || '',
+      log.memo || '',
     ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -388,6 +402,23 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
             </select>
             <SlidersHorizontal className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
+
+          {/* Profile (담당자) Filter */}
+          <div className="relative">
+            <select
+              value={profileFilter}
+              onChange={(e) => setProfileFilter(e.target.value)}
+              className="appearance-none pl-8 pr-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none cursor-pointer"
+            >
+              <option value="all">모든 담당자</option>
+              {profileOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <SlidersHorizontal className="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
       </div>
 
       {/* Table Container */}
@@ -408,8 +439,8 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                   '소통 상태',
                   '기타 소통 수단',
                   '2차 발송',
-                  '메모',
                   '담당자',
+                  '메모',
                   '',
                 ].map((label, i) => (
                   <th key={i} className="py-3 px-4 relative overflow-hidden text-ellipsis whitespace-nowrap">
@@ -540,6 +571,17 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                         />
                       </td>
 
+                      {/* 담당자 */}
+                      <td className="py-3.5 px-4">
+                        {log.profileName ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold text-[11px] truncate max-w-full">
+                            {log.profileName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+
                       {/* 메모 (Click to Edit) */}
                       <td className="py-3.5 px-4">
                         {isEditingMemo ? (
@@ -577,17 +619,6 @@ export const DmLogsView: React.FC<DmLogsViewProps> = ({
                             </span>
                             <Edit2 className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 ml-1" />
                           </div>
-                        )}
-                      </td>
-
-                      {/* 담당자 */}
-                      <td className="py-3.5 px-4">
-                        {log.profileName ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold text-[11px] truncate max-w-full">
-                            {log.profileName}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">-</span>
                         )}
                       </td>
 
